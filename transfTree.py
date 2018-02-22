@@ -125,21 +125,11 @@ def cut_into_leaves_tree(tree,nodes):
     dic = tree.__getstate__().copy()
     node_to_rem = list()
     nodes = list(set(nodes))
+    
     for node in nodes:
-        size_init = tree.node_count
-#        i = node
-#        j = node
         
+        size_init = tree.node_count
         node_to_rem = node_to_rem + sub_nodes(tree,node)[1:]
-#        while(tree.feature[i] != -2 or tree.feature[j] != -2):
-#            print('i : ',i)
-#            print('j :',j)
-#            if tree.feature[i] != -2 :
-#                i = tree.children_left[node]
-#            node_to_rem.append(i)
-#            if tree.feature[j] != -2:
-#                j = tree.children_right[node]
-#            node_to_rem.append(j)
         
     node_to_rem = list(set(node_to_rem))
     depths = depth_array(tree,list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem)))
@@ -151,10 +141,20 @@ def cut_into_leaves_tree(tree,nodes):
     dic['nodes']['feature'][nodes] = -2
     dic['nodes']['left_child'][nodes] = -1
     dic['nodes']['right_child'][nodes] = -1
+    
+    ind = list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem))
                 
-    dic['nodes'] = dic['nodes'][list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem))]
-    dic['values']= dic['values'][list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem))]
+    dic['nodes'] = dic['nodes'][ind]
+    dic['values']= dic['values'][ind]
+    
+    for i in range(dic['nodes']['left_child'].size):
+        if ( dic['nodes']['left_child'][i] != -1 ):        
+            dic['nodes']['left_child'][i] = ind.index(dic['nodes']['left_child'][i])
 
+    for i in range(dic['nodes']['right_child'].size):
+        if ( dic['nodes']['right_child'][i] != -1 ):        
+            dic['nodes']['right_child'][i] = ind.index(dic['nodes']['right_child'][i])
+            
     (Tree,(n_f,n_c,n_o),b) = tree.__reduce__()
     del tree
     
@@ -192,7 +192,7 @@ def SER(dTree,X_target,y_target):
     target_values = np.zeros((t_copy.node_count,1,t_copy.value.shape[-1]))
     sparseM = dTree.decision_path(X_target)
     
-    for iy in target_values.shape[-1]:
+    for iy in range(target_values.shape[-1]):
         target_values[:,0,iy] = np.sum(sparseM.toarray()[np.where(y_target == iy)[0]],axis = 0)
    
     updateValues(dTree.tree_,target_values)
@@ -236,69 +236,71 @@ y_target = y
 
 train = np.linspace(0,y.size-1,y.size).astype(int)[::20]
 all_ = np.linspace(0,y.size-1,y.size).astype(int)
+test = list(set(all_) - set(train))
 
 rf = (skl_ens.RandomForestClassifier(n_estimators=50,max_depth=10, oob_score=True))
 rf.fit(X[train],y[train])
 dTree = rf.estimators_[0]
 
 print('Arbre initial appr. sur '+str(train.size)+' données : '+str(dTree.tree_.node_count)+' noeuds')
-#SER(d,X[ind_test[0]],y[ind_test[0]])
+SER(dTree,X[test],y[test])
 
 #==============================================================================
 #       DEBUG TESTS
 #==============================================================================
 
-t_copy = copy.deepcopy(dTree.tree_)
-
-sparseM = dTree.decision_path(X_target)
-#target_values[:,:,0] = np.sum(sparseM.toarray()[np.where(y_target == 0)[0]],axis = 0)
-#target_values[:,:,1] = np.sum(sparseM.toarray()[np.where(y_target == 1)[0]],axis = 0)
-
-leaves = np.where(t_copy.feature == -2)[0]
-
-#expansion
-print('Expansion...')
-stop = 0
-for f in leaves :
-    ind = np.where(sparseM.toarray()[:,f] == 1 )[0]
-    
-    if ind.size != 0 :
-        Sv = X_target[ind]
-        #build full new tree from f
-        DT_to_add = sklearn.tree.DecisionTreeClassifier()
-        DT_to_add.min_impurity_split = 0
-        DT_to_add.fit(Sv,y_target[ind])
-        fusionDecisionTree(dTree, f, DT_to_add)
-
-t_copy = copy.deepcopy(dTree.tree_)
-target_values = np.zeros((t_copy.node_count,1,t_copy.value.shape[-1]))
-sparseM = dTree.decision_path(X_target)
-for iy in range(target_values.shape[-1]):
-    target_values[:,0,iy] = np.sum(sparseM.toarray()[np.where(y_target == iy)[0]],axis = 0)
-   
-updateValues(dTree.tree_,target_values)
-print(str(dTree.tree_.node_count)+' noeuds apres expansion')
-
-# TEST PREDICT CASSE
-try:
-    dTree.predict(X)
-    print('PREDICT CONSERVE')
-except:
-    print('PREDICT CASSE ')
-
-##reduction
-print('Reduction...')
-node_to_cut = list()
-for i_node in range(dTree.tree_.node_count):
-    if ( dTree.tree_.feature[i_node] != -2 ):
-        le = leaf_error(dTree.tree_,i_node )
-        e,nn= error(dTree.tree_,i_node)
-        if le <= e :
-            node_to_cut.append(i_node)
-
-print('Indices à couper : ',node_to_cut)
-cut_into_leaves(dTree,node_to_cut)
-
+#t_copy = copy.deepcopy(dTree.tree_)
+#
+#sparseM = dTree.decision_path(X_target)
+##target_values[:,:,0] = np.sum(sparseM.toarray()[np.where(y_target == 0)[0]],axis = 0)
+##target_values[:,:,1] = np.sum(sparseM.toarray()[np.where(y_target == 1)[0]],axis = 0)
+#
+#leaves = np.where(t_copy.feature == -2)[0]
+#
+##expansion
+#print('Expansion...')
+#stop = 0
+#for f in leaves :
+#    ind = np.where(sparseM.toarray()[:,f] == 1 )[0]
+#    
+#    if ind.size != 0 :
+#        Sv = X_target[ind]
+#        #build full new tree from f
+#        DT_to_add = sklearn.tree.DecisionTreeClassifier()
+#        DT_to_add.min_impurity_split = 0
+#        DT_to_add.fit(Sv,y_target[ind])
+#        fusionDecisionTree(dTree, f, DT_to_add)
+#
+#t_copy = copy.deepcopy(dTree.tree_)
+#target_values = np.zeros((t_copy.node_count,1,t_copy.value.shape[-1]))
+#sparseM = dTree.decision_path(X_target)
+#for iy in range(target_values.shape[-1]):
+#    target_values[:,0,iy] = np.sum(sparseM.toarray()[np.where(y_target == iy)[0]],axis = 0)
+#   
+#updateValues(dTree.tree_,target_values)
+#print(str(dTree.tree_.node_count)+' noeuds apres expansion')
+#
+## TEST PREDICT CASSE
+#try:
+#    dTree.predict(X)
+#    print('PREDICT CONSERVE')
+#except:
+#    print('PREDICT CASSE ')
+#
+###reduction
+#print('Reduction...')
+#node_to_cut = list()
+#for i_node in range(dTree.tree_.node_count):
+#    if ( dTree.tree_.feature[i_node] != -2 ):
+#        le = leaf_error(dTree.tree_,i_node )
+#        e,nn= error(dTree.tree_,i_node)
+#        if le <= e :
+#            print(str(le)+' <= '+str(e))
+#            node_to_cut.append(i_node)
+#
+#print('Indices à couper : ',node_to_cut)
+#cut_into_leaves(dTree,node_to_cut)
+#
 ## TEST PREDICT CASSE
 #try:
 #    dTree.predict(X)
@@ -311,3 +313,4 @@ cut_into_leaves(dTree,node_to_cut)
 
 
 print('Arbre initial réajuté sur '+str(all_.size)+' données : '+str(dTree.tree_.node_count)+' noeuds')
+
