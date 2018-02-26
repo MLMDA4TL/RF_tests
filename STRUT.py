@@ -164,15 +164,18 @@ def STRUT(decisiontree,
     tree.value[node_index] = current_class_distribution
     tree.impurity[node_index] = GINI(current_class_distribution)
     tree.n_node_samples[node_index] = Y_target_node.size
-    # If it is a leaf one, exit
-    if tree.children_left[node_index] == -1 and tree.children_right[node_index] == -1:
-        return 0
     
     # Unreachable node
     if current_class_distribution.sum() == 0 :
         prune_subtree(decisiontree,
                       node_index)
         tree.feature[node_index] = -2
+        tree.children_left[tree.children_left == node_index] = -1
+        tree.children_right[tree.children_right == node_index] = -1
+        return 0
+
+    # If it is a leaf one, exit
+    if tree.children_left[node_index] == -1 and tree.children_right[node_index] == -1:
         return 0
     
     # Only one class is present in the node -> terminal leaf
