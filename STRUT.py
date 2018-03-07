@@ -148,8 +148,12 @@ def prune_subtree(decisiontree,
         tree.children_right[node_index] = -1
 
 def GINI(class_distribution):
-    p = class_distribution / class_distribution.sum()
-    return 1 - (p**2).sum()
+    if class_distribution.sum():
+      p = class_distribution / class_distribution.sum()
+      return 1 - (p**2).sum()
+    return 0
+
+    
         
 def STRUT(decisiontree,
           node_index,
