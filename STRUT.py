@@ -5,6 +5,7 @@
 
 import numpy as np
 from sklearn import tree
+import copy
 
 def get_children_distributions(decisiontree,
                                node_index):
@@ -262,6 +263,12 @@ def STRUT(decisiontree,
               X_target_child_r,
               Y_target_child_r)
 
+def STRUT_RF(random_forest, X_target, y_target):
+  rf_strut = copy.deepcopy(random_forest)
+  for i,dtree in enumerate(rf_strut.estimators_):
+    STRUT(rf_strut.estimators_[i], 0, X_target, y_target)  
+  return rf_strut
+
 if __name__ == "__main__":
     import graphviz 
     import matplotlib.pyplot as plt
@@ -322,4 +329,5 @@ if __name__ == "__main__":
                              special_characters=True)  
 
     graph = graphviz.Source(dot_data)  
-    graph.render('child_tree.gv', view=True)   
+    graph.render('child_tree.gv', view=True) 
+
