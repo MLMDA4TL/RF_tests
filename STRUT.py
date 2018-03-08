@@ -175,7 +175,11 @@ def STRUT(decisiontree,
                       node_index)
         tree.feature[node_index] = -2
         tree.children_left[tree.children_left == node_index] = -1
+        tree.children_right[tree.children_left == node_index] = -1
+        tree.children_left[tree.children_right == node_index] = -1
         tree.children_right[tree.children_right == node_index] = -1
+        tree.feature[tree.children_left == node_index] = -2
+        tree.feature[tree.children_right == node_index] = -2
         return 0
 
     # If it is a leaf one, exit
