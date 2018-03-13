@@ -48,19 +48,21 @@ def depth_array(tree,inds):
         
 #important à maitriser :
 def fusionTree(tree1, f, tree2):
+    """adding tree tree2 to leaf f of tree tree1"""
+
     dic = tree1.__getstate__().copy()
     dic2 = tree2.__getstate__()
     
     size_init = tree1.node_count
-    
-    if depth(tree1,f) +  dic2['max_depth'] > dic['max_depth']:
-        dic['max_depth'] = depth(tree1,f) + tree2.max_depth 
-    
+
+    if depth(tree1, f) + dic2['max_depth'] > dic['max_depth']:
+        dic['max_depth'] = depth(tree1, f) + tree2.max_depth
+
     dic['capacity'] = tree1.capacity + tree2.capacity - 1
     dic['node_count'] = tree1.node_count + tree2.node_count - 1
-    
+
     dic['nodes'][f] = dic2['nodes'][0]
-    
+
     if (dic2['nodes']['left_child'][0] != - 1):
         dic['nodes']['left_child'][f] = dic2['nodes']['left_child'][0] + size_init - 1
     else:
@@ -90,7 +92,9 @@ def fusionTree(tree1, f, tree2):
     return tree1
     
 def fusionDecisionTree(dTree1, f, dTree2):
-    dTree1.tree_ = fusionTree(dTree1.tree_,f,dTree2.tree_)
+    """adding tree dTree2 to leaf f of tree dTree1"""
+
+    dTree1.tree_ = fusionTree(dTree1.tree_, f, dTree2.tree_)
     dTree1.max_depth = dTree1.tree_.max_depth
     return dTree1
 
@@ -113,19 +117,21 @@ def error(tree,node):
         if tree.feature[node] == -2 :
             return leaf_error(tree,node),1
         else:
-            er,nr = error(tree,tree.children_right[node])
-            el,nl = error(tree,tree.children_left[node])
-            return (el*nl+er*nr)/(nl+nr),nl+nr
-        
-def sub_nodes(tree,node):
-    if ( node == -1 ):
+            er, nr = error(tree, tree.children_right[node])
+            el, nl = error(tree, tree.children_left[node])
+            return (el * nl + er * nr) / (nl + nr), nl + nr
+
+
+def sub_nodes(tree, node):
+    if (node == -1):
         return list()
-    if ( tree.feature[node] == -2 ):
+    if (tree.feature[node] == -2):
         return [node]
     else:
-        return [node] + sub_nodes(tree,tree.children_left[node]) + sub_nodes(tree,tree.children_right[node])
-    
-def cut_into_leaves_tree(tree,nodes):
+        return [node] + sub_nodes(tree, tree.children_left[node]) + sub_nodes(tree, tree.children_right[node])
+
+
+def cut_into_leaves_tree(tree, nodes):
     dic = tree.__getstate__().copy()
     node_to_rem = list()
     nodes = list(set(nodes))
@@ -140,10 +146,10 @@ def cut_into_leaves_tree(tree,nodes):
     
     depths = depth_array(tree,list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem)))
     dic['max_depth'] = np.max(depths)
-    
+
     dic['capacity'] = tree.capacity - len(node_to_rem)
-    dic['node_count'] = tree.node_count  - len(node_to_rem)
-    
+    dic['node_count'] = tree.node_count - len(node_to_rem)
+
     dic['nodes']['feature'][nodes] = -2
     dic['nodes']['left_child'][nodes] = -1
     dic['nodes']['right_child'][nodes] = -1
@@ -151,8 +157,8 @@ def cut_into_leaves_tree(tree,nodes):
     ind = list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem))
                 
     dic['nodes'] = dic['nodes'][ind]
-    dic['values']= dic['values'][ind]
-    
+    dic['values'] = dic['values'][ind]
+
     for i in range(dic['nodes']['left_child'].size):
         if ( dic['nodes']['left_child'][i] != -1 ):        
             dic['nodes']['left_child'][i] = ind.index(dic['nodes']['left_child'][i])
@@ -163,67 +169,72 @@ def cut_into_leaves_tree(tree,nodes):
             
     (Tree,(n_f,n_c,n_o),b) = tree.__reduce__()
     del tree
-    
-    tree = Tree(n_f,n_c,n_o) 
+
+    tree = Tree(n_f, n_c, n_o)
     tree.__setstate__(dic)
-    
+
     return tree
 
-def cut_into_leaves(dTree,nodes):
-    dTree.tree_ = cut_into_leaves_tree(dTree.tree_,nodes)
+
+def cut_into_leaves(dTree, nodes):
+    dTree.tree_ = cut_into_leaves_tree(dTree.tree_, nodes)
     dTree.max_depth = dTree.tree_.max_depth
 
 
-def SER(dTree,X_target,y_target):
-    
-    t_copy = copy.deepcopy(dTree.tree_)    
+def SER(dTree, X_target, y_target):
+
+    t_copy = copy.deepcopy(dTree.tree_)
     sparseM = dTree.decision_path(X_target)
     leaves = np.where(t_copy.feature == -2)[0]
 
-    #expansion
+    # expansion
     print('Expansion...')
-    for f in leaves :
-        ind = np.where(sparseM.toarray()[:,f] == 1 )[0]
-        
-        if ind.size != 0 :
-            Sv = X_target[ind]
-            
-            #build full new tree from f
-            DT_to_add = sklearn.tree.DecisionTreeClassifier()
-            DT_to_add.min_impurity_split = 0
-            DT_to_add.fit(Sv,y_target[ind])
-            fusionDecisionTree(dTree, f, DT_to_add)
-        
-    t_copy = copy.deepcopy(dTree.tree_)
-    target_values = np.zeros((t_copy.node_count,1,t_copy.value.shape[-1]))
-    sparseM = dTree.decision_path(X_target)
-    
-    for iy in range(target_values.shape[-1]):
-        target_values[:,0,iy] = np.sum(sparseM.toarray()[np.where(y_target == iy)[0]],axis = 0)
-   
-    updateValues(dTree.tree_,target_values)
-    print(str(dTree.tree_.node_count)+' noeuds apres expansion')
+    for f in leaves:
+        # indices of instances ending up in leaf f
+        ind = np.where(sparseM.toarray()[:, f] == 1)[0]
 
-    #reduction
+        if ind.size != 0:
+            Sv = X_target[ind]
+
+            # build full new tree from f
+            DT_to_add = sklearn.tree.DecisionTreeClassifier()
+            # to make a complete tree
+            DT_to_add.min_impurity_split = 0
+            DT_to_add.fit(Sv, y_target[ind])
+            fusionDecisionTree(dTree, f, DT_to_add)
+
+    t_copy = copy.deepcopy(dTree.tree_)
+    target_values = np.zeros((t_copy.node_count, 1, t_copy.value.shape[-1]))
+    sparseM = dTree.decision_path(X_target)
+
+    for iy in range(target_values.shape[-1]):
+        target_values[:, 0, iy] = np.sum(
+            sparseM.toarray()[np.where(y_target == iy)[0]], axis=0)
+
+    updateValues(dTree.tree_, target_values)
+    print(str(dTree.tree_.node_count) + ' noeuds apres expansion')
+
+    # reduction
     print('Reduction...')
     node_to_cut = list()
     for i_node in range(dTree.tree_.node_count):
-
-        if ( dTree.tree_.feature[i_node] != -2 ):
-            le = leaf_error(dTree.tree_,i_node )
-            e,nn= error(dTree.tree_,i_node)
-            if le <= e :
+        if (dTree.tree_.feature[i_node] != -2):
+            le = leaf_error(dTree.tree_, i_node)
+            e, nn = error(dTree.tree_, i_node)
+            if le <= e:
                 node_to_cut.append(i_node)
-    
-    cut_into_leaves(dTree,node_to_cut)
 
+    cut_into_leaves(dTree, node_to_cut)
+
+    print(str(dTree.tree_.node_count) + ' noeuds apres reduction')
     return dTree
 
+
 def SER_RF(random_forest, X_target, y_target):
-  rf_ser = copy.deepcopy(random_forest)
-  for i,dtree in enumerate(rf_ser.estimators_):
-    rf_ser.estimators_[i] = SER(rf_ser.estimators_[i], X_target, y_target)  
-  return rf_ser
+    rf_ser = copy.deepcopy(random_forest)
+    for i, dtree in enumerate(rf_ser.estimators_):
+        rf_ser.estimators_[i] = SER(rf_ser.estimators_[i], X_target, y_target)
+    return rf_ser
 
 def all_splits(X,ind_feats,min_delta = 10e-7):
     x_sorted = X[:,ind_feats].copy()
@@ -293,7 +304,7 @@ def search_best_split(decision_tree,node_index, ind_feats, Q_source_parent,
 
 if __name__ == "__main__":
     iris = datasets.load_iris()
-    X = iris.data  
+    X = iris.data
     y = iris.target
 
     K = 2
