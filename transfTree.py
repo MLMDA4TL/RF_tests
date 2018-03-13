@@ -116,7 +116,7 @@ def leaf_error(tree, node):
             # print("WARNING : div by 0 (node ", node, " )")
             return 0
         else:
-            return np.min(tree.value[node]) / np.sum(tree.value[node])
+            return 1 - (np.max(tree.value[node]) / np.sum(tree.value[node]))
 
 
 def error(tree, node):
