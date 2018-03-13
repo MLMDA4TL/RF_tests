@@ -5,6 +5,7 @@
 
 import numpy as np
 from sklearn import tree
+import copy
 
 def get_children_distributions(decisiontree,
                                node_index):
@@ -148,8 +149,12 @@ def prune_subtree(decisiontree,
         tree.children_right[node_index] = -1
 
 def GINI(class_distribution):
-    p = class_distribution / class_distribution.sum()
-    return 1 - (p**2).sum()
+    if class_distribution.sum():
+      p = class_distribution / class_distribution.sum()
+      return 1 - (p**2).sum()
+    return 0
+
+    
         
 def STRUT(decisiontree,
           node_index,
@@ -171,7 +176,11 @@ def STRUT(decisiontree,
                       node_index)
         tree.feature[node_index] = -2
         tree.children_left[tree.children_left == node_index] = -1
+        tree.children_right[tree.children_left == node_index] = -1
+        tree.children_left[tree.children_right == node_index] = -1
         tree.children_right[tree.children_right == node_index] = -1
+        tree.feature[tree.children_left == node_index] = -2
+        tree.feature[tree.children_right == node_index] = -2
         return 0
 
     # If it is a leaf one, exit
@@ -254,6 +263,12 @@ def STRUT(decisiontree,
               X_target_child_r,
               Y_target_child_r)
 
+def STRUT_RF(random_forest, X_target, y_target):
+  rf_strut = copy.deepcopy(random_forest)
+  for i,dtree in enumerate(rf_strut.estimators_):
+    STRUT(rf_strut.estimators_[i], 0, X_target, y_target)  
+  return rf_strut
+
 if __name__ == "__main__":
     import graphviz 
     import matplotlib.pyplot as plt
@@ -314,4 +329,5 @@ if __name__ == "__main__":
                              special_characters=True)  
 
     graph = graphviz.Source(dot_data)  
-    graph.render('child_tree.gv', view=True)   
+    graph.render('child_tree.gv', view=True) 
+
