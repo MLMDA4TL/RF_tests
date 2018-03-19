@@ -2,7 +2,7 @@ import sklearn.ensemble as skl_ens
 from sklearn.tree import export_graphviz
 
 import data
-from transfTree import SER
+from transfTree import SER_RF
 from STRUT import STRUT
 from transfTree import fusionDecisionTree
 
@@ -15,29 +15,30 @@ APPLY_SER = 1
 # =======================================================
 #   Data
 # =======================================================
-X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = data.load_mushroom()
+X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = data.load_letter()
 
 # =======================================================
 #   CLF initialisation
 # =======================================================
 rf_source = skl_ens.RandomForestClassifier(
-    n_estimators=NB_TREE, oob_score=True)
+    n_estimators=NB_TREE,
+    oob_score=True)
 rf_source.fit(X_source, y_source)
-
 rf_source_score_target = rf_source.score(X_target_095, y_target_095)
-
 print("Error rate de rf_source sur data target : ",
       round(1 - rf_source_score_target, 2))
 
-rf_target = skl_ens.RandomForestClassifier(n_estimators=NB_TREE, oob_score=True,
-                                           class_weight='balanced')
-
+rf_target = skl_ens.RandomForestClassifier(n_estimators=NB_TREE,
+                                           oob_score=True,
+                                           class_weight=None)
 rf_target.fit(X_target_005, y_target_005)
 rf_target_score_target = rf_target.score(X_target_095, y_target_095)
-
 print("Error rate de rf_target(5%) sur data target(95%) : ",
       round(1 - rf_target_score_target, 2))
 
+# =======================================================
+#   Tests
+# =======================================================
 # dtree0 = rf_source.estimators_[0]
 # dtree1 = rf_source.estimators_[1]
 
@@ -65,15 +66,8 @@ print("Error rate de rf_target(5%) sur data target(95%) : ",
 #   SER algorithm
 # =======================================================
 if APPLY_SER:
-    for i in range(NB_TREE):
-        print("Tree ", i)
-        print("nb noeuds initial : ",
-              rf_source.estimators_[i].tree_.node_count)
-        output = SER(rf_source.estimators_[i], X_target_005, y_target_005)
-        print("nb noeuds après SER : ",
-              rf_source.estimators_[i].tree_.node_count)
-
-    # now every tree of rf_sourse has been modified
+    SER_RF(rf_source, X_target_005, y_target_005)
+    # now every tree of rf_source has been modified
     rf_source_SER_score = rf_source.score(X_target_095, y_target_095)
     print("Error rate de rf_source_SER sur data target(95%) : ",
           round(1 - rf_source_SER_score, 2))

@@ -15,7 +15,7 @@ def categorical_encoder(X):
         X[:, i] = enc_label.fit_transform(X[:, i])
         # print("labels : ", enc_label.classes_)
     X = X.astype('int')
-    # trannsform integer labels using one-hot
+    # encoding integer labels using one-hot
     X = enc_onehot.fit_transform(X).toarray()
     # print("nb_labels : ", enc_onehot.n_values_)
     return X, enc_onehot.n_values_
@@ -59,7 +59,7 @@ def load_mushroom():
     ind_t = X[:, ind_stalk_shape_t] == 0
     # concatenate X and y
     y = y.reshape((-1, 1))
-    X = np.concatenate((y, X), axis=1)
+    X = np.concatenate((y, X), axis=1).astype(int)
     # separating source & target
     X_source = X[ind_s]
     X_target = X[ind_t]
@@ -109,6 +109,6 @@ def load_wine():
 
 if __name__ == "__main__":
     print("test")
-    X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_mushroom()
-    X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_wine()
-    X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_letter()
+    # X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_mushroom()
+    # X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_wine()
+    # X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_letter()
