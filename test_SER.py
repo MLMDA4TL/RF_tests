@@ -3,14 +3,17 @@ from sklearn.tree import export_graphviz
 
 import data
 from transfTree import SER_RF
-from STRUT import STRUT
+from STRUT import STRUT_RF
 from transfTree import fusionDecisionTree
+from utils import error_rate
 
 # =======================================================
 #   Parameters
 # =======================================================
 NB_TREE = 50
 APPLY_SER = 1
+APPLY_STRUT = 1
+APPLY_MIX = 0
 
 # =======================================================
 #   Data
@@ -26,7 +29,7 @@ rf_source = skl_ens.RandomForestClassifier(
 rf_source.fit(X_source, y_source)
 rf_source_score_target = rf_source.score(X_target_095, y_target_095)
 print("Error rate de rf_source sur data target : ",
-      round(1 - rf_source_score_target, 2))
+      error_rate(rf_source_score_target))
 
 rf_target = skl_ens.RandomForestClassifier(n_estimators=NB_TREE,
                                            oob_score=True,
@@ -34,7 +37,7 @@ rf_target = skl_ens.RandomForestClassifier(n_estimators=NB_TREE,
 rf_target.fit(X_target_005, y_target_005)
 rf_target_score_target = rf_target.score(X_target_095, y_target_095)
 print("Error rate de rf_target(5%) sur data target(95%) : ",
-      round(1 - rf_target_score_target, 2))
+      error_rate(rf_target_score_target))
 
 # =======================================================
 #   Tests
@@ -66,8 +69,26 @@ print("Error rate de rf_target(5%) sur data target(95%) : ",
 #   SER algorithm
 # =======================================================
 if APPLY_SER:
-    SER_RF(rf_source, X_target_005, y_target_005)
-    # now every tree of rf_source has been modified
-    rf_source_SER_score = rf_source.score(X_target_095, y_target_095)
-    print("Error rate de rf_source_SER sur data target(95%) : ",
-          round(1 - rf_source_SER_score, 2))
+    rf_ser = SER_RF(rf_source, X_target_005, y_target_005)
+    # nb: rf_source is not modified (deep copy inside function)
+    rf_source_SER_score = rf_ser.score(X_target_095, y_target_095)
+    print("Error rate de rf_ser sur data target(95%) : ",
+          error_rate(rf_source_SER_score))
+
+if APPLY_STRUT:
+    rf_strut = STRUT_RF(rf_source, X_target_005, y_target_005)
+    rf_source_STRUT_score = rf_strut.score(X_target_095, y_target_095)
+    print("Error rate de rf_strut sur data target(95%) : ",
+          error_rate(rf_source_STRUT_score))
+
+if APPLY_MIX:
+    rf_mix = skl_ens.RandomForestClassifier(n_estimators=100, oob_score=True)
+    # fit to create estimatros_
+    rf_mix.fit(X_source, y_source)
+    for i, dtree in enumerate(rf_strut.estimators_):
+        rf_mix.estimators_[i] = rf_strut.estimators_[i]
+    for i, dtree in enumerate(rf_ser.estimators_):
+        rf_mix.estimators_[i + 50] = rf_ser.estimators_[i]
+    rf_source_MIX_score = rf_mix.score(X_target_095, y_target_095)
+    print("Error rate de rf_mix sur data target(95%) : ",
+          error_rate(rf_source_MIX_score))
