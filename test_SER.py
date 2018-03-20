@@ -12,13 +12,14 @@ from utils import error_rate
 # =======================================================
 NB_TREE = 50
 APPLY_SER = 1
-APPLY_STRUT = 1
+APPLY_STRUT = 0
 APPLY_MIX = 0
 
 # =======================================================
 #   Data
 # =======================================================
 X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = data.load_letter()
+# X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = data.load_mushroom()
 
 # =======================================================
 #   CLF initialisation
