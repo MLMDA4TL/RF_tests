@@ -347,4 +347,8 @@ if __name__ == "__main__":
     SER(dTree, X[test], y[test])
 
     print('Arbre initial réajuté sur ' + str(all_.size) +
+<<<<<<< HEAD
           ' données : ' + str(dTree.tree_.node_count) + ' noeuds')
+=======
+          ' données : ' + str(dTree.tree_.node_count) + ' noeuds')
+>>>>>>> 19d16715307c6838434bf01cb884f227b814a736
