@@ -167,8 +167,11 @@ def fusionDecisionTree(dTree1, f, dTree2):
     #dTree = sklearn.tree.DecisionTreeClassifier()
     size_init = dTree1.tree_.node_count
     dTree1.tree_ = fusionTree(dTree1.tree_, f, dTree2.tree_)
-    dTree1.tree_.value[size_init:, :,
-                       dTree2.classes_] = dTree2.tree_.value[1:, :, :]
+    try:
+        dTree1.tree_.value[size_init:, :, dTree2.classes_] = dTree2.tree_.value[1:, :, :]
+    except IndexError as e:
+        print("IndexError : size init : ", size_init, "\ndTree2.classes_ : ", dTree2.classes_)
+        print(e)
     dTree1.max_depth = dTree1.tree_.max_depth
     return dTree1
 
@@ -224,8 +227,6 @@ def cut_from_left_right(dTree, node, bool_left_right):
         dic['nodes']['right_child'][p] = repl_node
     elif b == -1:
         dic['nodes']['left_child'][p] = repl_node
-    else:
-        print('erreur ! ')
 
     #new_size = len(ind)
     dic_old = dic.copy()
@@ -329,6 +330,7 @@ def SER(node, dTree, X_target_node, y_target_node):
                 DT_to_add.min_impurity_decrease = 0
             except:
                 DT_to_add.min_impurity_split = 0
+            # print("classes target: ", set(y_target_node))
             DT_to_add.fit(X_target_node, y_target_node)
             fusionDecisionTree(dTree, node, DT_to_add)
 

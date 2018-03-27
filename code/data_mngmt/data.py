@@ -4,6 +4,9 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.model_selection import train_test_split
 
 
+data_path = "../../data/real_data/"
+
+
 def categorical_encoder(X):
     """
     Transforming categorical features into numerical using One-Hot method
@@ -23,7 +26,7 @@ def categorical_encoder(X):
 
 def load_letter():
     # load data
-    df = pd.read_csv("data/letter/letter-recognition.data.txt",
+    df = pd.read_csv(data_path + "/letter/letter-recognition.data.txt",
                      sep=',', header=None)
     # constructing numerical labels
     letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -43,7 +46,7 @@ def load_letter():
 
 
 def load_mushroom():
-    df = pd.read_csv("data/mushroom/agaricus-lepiota.data.txt", sep=',',
+    df = pd.read_csv(data_path + "/mushroom/agaricus-lepiota.data.txt", sep=',',
                      header=None)
     # re-labelling
     df.iloc[:, 0][df.iloc[:, 0] == 'p'] = 0
@@ -92,23 +95,45 @@ def load_mushroom():
 
 def load_wine():
     # loading data (source & target already separated)
-    df_target = pd.read_csv("data/wine_uminho/winequality-red.csv",
+    df_target = pd.read_csv(data_path + "/wine_uminho/winequality-red.csv",
                             sep=';', header=0)
-    df_source = pd.read_csv("data/wine_uminho/winequality-white.csv",
+    df_source = pd.read_csv(data_path + "/wine_uminho/winequality-white.csv",
                             sep=';', header=0)
+    # relabelling the classes
+    quality_lvl = [3, 4, 5, 6, 7, 8, 9]
+    label = {quality: i for i, quality in enumerate(quality_lvl)}
+    df_target.iloc[:, -1] = [label[l] for l in df_target.iloc[:, -1]]
+    df_source.iloc[:, -1] = [label[l] for l in df_source.iloc[:, -1]]
     # separating 5% & 95% of target data, stratified, random
     X_target_095, X_target_005, y_target_095, y_target_005 = train_test_split(
             df_target.iloc[:, :-1],
             df_target.iloc[:, -1],
             test_size=0.05,
             stratify=df_target.iloc[:, -1])
-    return [df_source.iloc[:, :-1].values, X_target_005.values,
-            X_target_095.values, df_source.iloc[:, -1].values,
-            y_target_005.values, y_target_095.values]
+    X_target_005 = X_target_005.values
+    X_target_095 = X_target_095.values
+    y_target_005 = y_target_005.values
+    y_target_095 = y_target_095.values
+
+    # # taking one of label 3 sample from target 5% to put in target 95%
+    # ind = np.where(y_target_095 == 3)[0][0]
+    # X_target_005 = np.concatenate((X_target_005, X_target_095[ind,
+        # :].reshape((1, -1))), axis=0)
+    # y_target_005 = np.concatenate((y_target_005, np.array([3])), axis=0)
+    # X_target_095 = np.delete(X_target_095, ind, axis=0)
+    # y_target_095 = np.delete(y_target_095, ind, axis=0)
+    return [df_source.iloc[:, :-1].values, X_target_005,
+            X_target_095, df_source.iloc[:, -1].values,
+            y_target_005, y_target_095]
 
 
 if __name__ == "__main__":
     print("test")
     # X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_mushroom()
-    # X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_wine()
+    X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_wine()
     # X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = load_letter()
+
+    ind = np.where(y_target_095 == 3)[0][0]
+    X_target_005 = np.concatenate((X_target_005, X_target_095[ind,
+        :].reshape((1, -1))), axis=0)
+    X_target_095 = np.delete(X_target_095, ind, axis=0)
