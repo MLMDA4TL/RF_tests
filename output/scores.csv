@@ -35,3 +35,14 @@ ser,5,10,letter,25.67,0
 strut,5,10,letter,87.41,17
 source_only,5,10,letter,83.66,
 target_only,5,10,letter,27.64,
+ser,None,50,letter,23.3,1609
+strut,None,50,letter,31.88,285
+source_only,None,50,letter,65.15,
+target_only,None,50,letter,22.37,
+ser,None,50,letter,22.78,1708
+strut,None,50,letter,33.78,297
+source_only,None,50,letter,65.86,
+target_only,None,50,letter,21.9,
+strut,,50,letter,32.4,313
+source_only,,50,letter,64.7,
+target_only,,50,letter,21.15,

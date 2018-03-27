@@ -154,7 +154,18 @@ def GINI(class_distribution):
       return 1 - (p**2).sum()
     return 0
 
-    
+def find_parent(tree, i_node):
+    p = -1
+    b = 0
+    dic = tree.__getstate__()
+    if i_node != 0 and i_node != -1:
+      if i_node in dic['nodes']['left_child']:
+        p = list(dic['nodes']['left_child']).index(i_node)
+        b = -1
+      elif i_node in dic['nodes']['right_child']:
+        p = list(dic['nodes']['right_child']).index(i_node)
+        b = 1
+    return p, b
         
 def STRUT(decisiontree,
           node_index,
@@ -174,13 +185,25 @@ def STRUT(decisiontree,
     if current_class_distribution.sum() == 0 :
         prune_subtree(decisiontree,
                       node_index)
-        tree.feature[node_index] = -2
-        tree.children_left[tree.children_left == node_index] = -1
-        tree.children_right[tree.children_left == node_index] = -1
-        tree.children_left[tree.children_right == node_index] = -1
-        tree.children_right[tree.children_right == node_index] = -1
-        tree.feature[tree.children_left == node_index] = -2
-        tree.feature[tree.children_right == node_index] = -2
+        parent_node,b_p = find_parent(tree, node_index)
+        # Get the brother index
+        if b_p == -1: # current_node is left_children
+          brother_node = tree.children_right[parent_node]
+        if b_p == 1: # current_node is right_children
+          brother_node = tree.children_left[parent_node]
+        # Get grand parent index
+        grand_parent_node,b_gp = find_parent(tree, parent_node)
+        # Shunt the parent
+        if b_gp == -1: # parent is left_children of grandparent
+          tree.children_left[grand_parent_node] = brother_node
+
+        if b_gp == 1: # parent is right_children of grandparent
+          tree.children_right[grand_parent_node] = brother_node
+        # supress the current node
+        tree.children_left[node_index] = -1
+        tree.children_right[node_index] = -1
+        tree.children_left[parent_node] = -1
+        tree.children_right[parent_node] = -1
         return 0
 
     # If it is a leaf one, exit
@@ -192,8 +215,6 @@ def STRUT(decisiontree,
         prune_subtree(decisiontree,
                       node_index)
         tree.feature[node_index] = -2
-        if Y_target_node.size >0:
-            tree.value[node_index] = np.asarray([compute_class_distribution(classes,Y_target_node)])
         return 0
     
     # update threshold

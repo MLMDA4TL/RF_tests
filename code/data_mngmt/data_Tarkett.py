@@ -1,3 +1,6 @@
+import sys
+
+sys.path.insert()
 import lib_files_s3 as lib_s3
 
 

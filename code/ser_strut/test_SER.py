@@ -22,7 +22,7 @@ from utils import error_rate, write_score
 NB_TREE = 50
 MAX_DEPTH = None
 
-APPLY_SER = 1
+APPLY_SER = 0
 APPLY_STRUT = 1
 APPLY_MIX = 0
 
@@ -128,6 +128,9 @@ if APPLY_MIX:
 # =======================================================
 if WRITE_SCORE:
     score = namedtuple("Score", "algo max_depth nb_tree data error_rate time")
+
+    if MAX_DEPTH is None:
+        score.max_depth = "None"
     score.max_depth = MAX_DEPTH
     score.nb_tree = NB_TREE
     score.data = DATASET
