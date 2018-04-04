@@ -16,6 +16,11 @@ def apply_drift(clusters, cluster_feature_speed, min_coordinate, max_coordinate)
 			clusters[cluster_id].centroid[feature] += speed
 		elastic_collision(clusters[cluster_id],min_coordinate,max_coordinate)
 
+def apply_density_change(clusters, cluster_feature_std):
+	for cluster_id, feature_std in cluster_feature_std.iteritems():
+		for feature, std in feature_std.iteritems():
+			clusters[cluster_id].radii[feature] = std
+
 def create_new_clusters(clusters,list_parameters_cluster_creation):
 	for parameter in list_parameters_cluster_creation:
 		new_cluster = ClusterPoints(**parameter)
