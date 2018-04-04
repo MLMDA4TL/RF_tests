@@ -8,8 +8,6 @@ COMMENTS_SYMBOL = "#"
 
 def apply_drift(clusters, cluster_feature_speed, min_coordinate, max_coordinate):
 	def elastic_collision(cluster,min_coordinate,max_coordinate):
-		cluster.speed[cluster.centroid >= max_coordinate] *= -1
-		cluster.speed[cluster.centroid <= min_coordinate] *= -1
 		cluster.centroid[cluster.centroid >= max_coordinate] = max_coordinate
 		cluster.centroid[cluster.centroid <= min_coordinate] = min_coordinate
 
