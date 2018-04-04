@@ -1,0 +1,29 @@
+digraph Tree {
+node [shape=box, style="filled, rounded", color="black", fontname=helvetica] ;
+edge [fontname=helvetica] ;
+0 [label=<f6 &le; -0.803<br/>gini = 0.565<br/>samples = 50<br/>value = [0.0, 1.0, 32.0, 0.0, 2.0, 3.0, 2.0, 1.0, 3.0, 6.0]<br/>class = c2>, fillcolor="#7be53997"] ;
+1 [label=<f2 &le; -1.564<br/>gini = 0.76<br/>samples = 10<br/>value = [0.0, 1.0, 0.0, 0.0, 0.0, 3.0, 2.0, 1.0, 3.0, 0.0]<br/>class = c5>, fillcolor="#399de500"] ;
+0 -> 1 [labeldistance=2.5, labelangle=45, headlabel="True"] ;
+2 [label=<f5 &le; -7.822<br/>gini = 0.611<br/>samples = 6<br/>value = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 3.0, 0.0]<br/>class = c8>, fillcolor="#e539c040"] ;
+1 -> 2 ;
+6 [label=<gini = 0.0<br/>samples = 1<br/>value = [0, 0, 0, 0, 0, 0, 1, 0, 0, 0]<br/>class = c6>, fillcolor="#3c39e5ff"] ;
+2 -> 6 ;
+3 [label=<f1 &le; 4.242<br/>gini = 0.56<br/>samples = 5<br/>value = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 3.0, 0.0]<br/>class = c8>, fillcolor="#e539c080"] ;
+2 -> 3 ;
+4 [label=<gini = 0.0<br/>samples = 3<br/>value = [0, 0, 0, 0, 0, 0, 0, 0, 3, 0]<br/>class = c8>, fillcolor="#e539c0ff"] ;
+3 -> 4 ;
+5 [label=<gini = 0.5<br/>samples = 2<br/>value = [0, 1, 0, 0, 0, 0, 1, 0, 0, 0]<br/>class = c1>, fillcolor="#e2e53900"] ;
+3 -> 5 ;
+7 [label=<gini = 0.375<br/>samples = 4<br/>value = [0, 0, 0, 0, 0, 3, 0, 1, 0, 0]<br/>class = c5>, fillcolor="#399de5aa"] ;
+1 -> 7 ;
+8 [label=<f0 &le; -0.168<br/>gini = 0.335<br/>samples = 40<br/>value = [0.0, 0.0, 32.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 6.0]<br/>class = c2>, fillcolor="#7be539c3"] ;
+0 -> 8 [labeldistance=2.5, labelangle=-45, headlabel="False"] ;
+9 [label=<f1 &le; -2.845<br/>gini = 0.111<br/>samples = 34<br/>value = [0.0, 0.0, 32.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0]<br/>class = c2>, fillcolor="#7be539ef"] ;
+8 -> 9 ;
+10 [label=<gini = 0.0<br/>samples = 32<br/>value = [0, 0, 32, 0, 0, 0, 0, 0, 0, 0]<br/>class = c2>, fillcolor="#7be539ff"] ;
+9 -> 10 ;
+11 [label=<gini = 0.0<br/>samples = 2<br/>value = [0, 0, 0, 0, 2, 0, 0, 0, 0, 0]<br/>class = c4>, fillcolor="#39e5c5ff"] ;
+9 -> 11 ;
+16 [label=<gini = 0.0<br/>samples = 6<br/>value = [0, 0, 0, 0, 0, 0, 0, 0, 0, 6]<br/>class = c9>, fillcolor="#e53958ff"] ;
+8 -> 16 ;
+}
