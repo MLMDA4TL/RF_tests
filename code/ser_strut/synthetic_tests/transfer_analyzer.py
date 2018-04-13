@@ -4,7 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import tree
-import graphviz 
+#import graphviz 
+from sklearn.tree import export_graphviz
+import Generator as Gen
+
 from os import listdir
 from os.path import join,isfile
 import copy
@@ -20,13 +23,13 @@ def STRUT_function(source_model, X_train, Y_train):
 def SER_function(source_model, X_train, Y_train):
     SER(0, source_model, X_train,Y_train)
 
-def plot_tree(clf,feature_names, class_names):
-    dot_data = tree.export_graphviz(clf, out_file=None, 
+def plot_tree(path,clf,feature_names, class_names):
+    graph = tree.export_graphviz(clf, out_file=path+'test.dot', 
                              feature_names=feature_names,  
                              class_names=class_names,  
                              filled=True,rounded=True,  
                              special_characters=True)  
-    graph = graphviz.Source(dot_data)  
+    #graph = graphviz.Source(dot_data)  
     return graph
 
 def save_tree(graph,name):
@@ -61,15 +64,16 @@ def save_transfer_model(base_name,folder,model,features_names,classes_names):
     path = join(folder,base_name)
     pickle.dump(model, open(path+".pickle","wb"))
     try:
-        graph = plot_tree(model,features_names, classes_names)
-        save_tree(graph,path+"_graph.gv")
+        graph = plot_tree(path,model,features_names, classes_names)
+        #save_tree(graph,path+"_graph.gv")
     except:
-        print "graph error: "+ path
+        print("graph error: "+ path)
 
 # Large Sample
 ########
 # Source model
 source_model = pickle.load(open("source_models/source_D10_C10_Projected_8-10_model.pickle","rb"))
+
 # Target data
 folder_target_datasets = "synthetic_datasets/target/"
 # Evaluation DF
@@ -85,7 +89,7 @@ ser_folder = join(folder_target_models,"SER/large_sample/")
 
 
 for fname in listdir(folder_target_datasets):
-    print fname
+    print(fname)
     if ".csv" in fname and fname[0] != ".":
         path = join(folder_target_datasets,fname)
         base_name = fname.split(".")[0]
@@ -116,12 +120,12 @@ for fname in listdir(folder_target_datasets):
             # Save results
             save_transfer_model(base_name,strut_folder,
                                 target_model_strut,
-                                ["f"+`i` for i in range(10)],
-                                ["c"+`i` for i in range(10)])
+                                ["f"+str(i) for i in range(10)],
+                                ["c"+str(i) for i in range(10)])
             save_transfer_model(base_name,ser_folder,
                                 target_model_ser,
-                                ["f"+`i` for i in range(10)],
-                                ["c"+`i` for i in range(10)])
+                                ["f"+str(i) for i in range(10)],
+                                ["c"+str(i) for i in range(10)])
 
 
 
@@ -144,7 +148,7 @@ ser_folder = join(folder_target_models,"SER/small_sample/")
 
 
 for fname in listdir(folder_target_datasets):
-    print fname
+    print(fname)
     if ".csv" in fname and fname[0] != ".":
         path = join(folder_target_datasets,fname)
         base_name = fname.split(".")[0]
@@ -175,12 +179,12 @@ for fname in listdir(folder_target_datasets):
             # Save results
             save_transfer_model(base_name,strut_folder,
                                 target_model_strut,
-                                ["f"+`i` for i in range(10)],
-                                ["c"+`i` for i in range(10)])
+                                ["f"+str(i) for i in range(10)],
+                                ["c"+str(i) for i in range(10)])
             save_transfer_model(base_name,ser_folder,
                                 target_model_ser,
-                                ["f"+`i` for i in range(10)],
-                                ["c"+`i` for i in range(10)])
+                                ["f"+str(i) for i in range(10)],
+                                ["c"+str(i) for i in range(10)])
 
 strut_results_small_sample.to_csv("strut_results_small_sample.csv")
 ser_results_small_sample.to_csv("ser_results_small_sample.csv")

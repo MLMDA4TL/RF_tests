@@ -29,7 +29,7 @@ class ClusterPoints:
 		self.nb_not_projected_dims = self.dimensionality - self.nb_projected_dims
 		self.projected_dims = np.hstack((np.ones(self.nb_projected_dims), np.zeros(self.dimensionality - self.nb_projected_dims)))
 		np.random.shuffle(self.projected_dims)
-		print self.centroid
+		print(self.centroid)
 	
 	def generate_uniform_value(self, min_value, max_value, size = None):
 		if size is None: size = self.dimensionality
@@ -77,7 +77,7 @@ class StreamGenerator:
 		
 
 	def run(self):
-		for i in xrange(self.number_points):
+		for i in range(self.number_points):
 			self.compute_probabilities_draw_cluster()
 			cluster_id = np.random.choice(range(len(self.clusters)),1,p=self.probability_draw_cluster)[0]
 			new_point = self.clusters[cluster_id].generate_point()
@@ -97,8 +97,8 @@ class StreamGenerator:
 		for i,c in enumerate(self.run()):
 		    stream_df.append(c)#loc[i] = c 
 		    stream_ss.append(self.clusters[int(c[-1])].projected_dims.copy())#loc[i] =
-		stream_df = pd.DataFrame(stream_df,columns= range(self.dimensionality)+["cluster"])
-		stream_ss = pd.DataFrame(stream_ss,columns= range(self.dimensionality))
+		stream_df = pd.DataFrame(stream_df,columns= list(range(self.dimensionality))+["cluster"])
+		stream_ss = pd.DataFrame(stream_ss,columns= list(range(self.dimensionality)))
 		return stream_ss, stream_df
 
 	def get_file_name(self):
