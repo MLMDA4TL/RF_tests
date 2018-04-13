@@ -223,6 +223,8 @@ def add_to_parents(d, node, values):
     p,b = find_parent(d,node)
     if b != 0: 
         d['values'][p] =  d['values'][p] + values
+        d['nodes']['n_node_samples'][p] =  d['nodes']['n_node_samples'][p] + np.sum(values)
+        d['nodes']['weighted_n_node_samples'][p] =  d['nodes']['weighted_n_node_samples'][p] + np.sum(values)
         add_to_parents(d, p, values)
         
         
