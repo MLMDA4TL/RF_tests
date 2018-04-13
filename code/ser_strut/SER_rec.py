@@ -169,8 +169,9 @@ def fusionDecisionTree(dTree1, f, dTree2):
     #dTree = sklearn.tree.DecisionTreeClassifier()
     size_init = dTree1.tree_.node_count
     dTree1.tree_ = fusionTree(dTree1.tree_, f, dTree2.tree_)
+
     try:
-        dTree1.tree_.value[size_init:, :, dTree2.classes_] = dTree2.tree_.value[1:, :, :]
+        dTree1.tree_.value[size_init:, :, dTree2.classes_.astype(int)] = dTree2.tree_.value[1:, :, :]
     except IndexError as e:
         print("IndexError : size init : ", size_init, "\ndTree2.classes_ : ", dTree2.classes_)
         print(e)
