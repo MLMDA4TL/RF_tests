@@ -61,7 +61,7 @@ class dt2nn:
     self.W_leaves_out = (self.W_leaves_out.T * 1./ self.W_leaves_out.T.sum()).T
     self.W_leaves_out *= self.gammas[2]
     # Fill class biases
-    self.b_class = np.zeros(self.C)
+    self.b_class = pd.DataFrame(np.zeros(self.C), index = self.classes)
 
   def to_keras(self,
                dropouts = [0.1,0.1],
@@ -95,7 +95,7 @@ class dt2nn:
     self.model.layers[3].set_weights(weights=[self.W_nodes_leaves,
                                              self.b_leaves.values.flatten()])
     self.model.layers[5].set_weights(weights=[self.W_leaves_out,
-                                              self.b_class.flatten()])
+                                              self.b_class.values.flatten()])
 
   def fit(self,
           X,
@@ -121,7 +121,36 @@ class dt2nn:
   def get_activations(self,
               X,
               y = None):
-    return self.model_nodes.predict(X),self.model_leaves.predict(X), self.model.predict(X)
+    nodes_a = pd.DataFrame(self.model_nodes.predict(X),
+                           index = self.W_in_nodes.index,
+                           columns = self.W_in_nodes.columns)
+    leaves_a = pd.DataFrame(self.model_leaves.predict(X),
+                            index = self.W_nodes_leaves.index,
+                            columns = self.W_nodes_leaves.columns)
+    output_a = pd.DataFrame(self.model.predict(X),
+                            index = self.W_leaves_out.index,
+                            columns = self.W_leaves_out.columns)
+    return nodes_a, leaves_a, output_a
+
+  def get_weights_from_NN(self):
+    w_1 = self.model.layers[1].get_weights()
+                       
+    self.W_in_nodes_nn = pd.DataFrame(w_1[0],
+                         index = self.W_in_nodes.index,
+                         columns = self.W_in_nodes.columns)
+    self.b_nodes = pd.DataFrame(w_1[1],index=self.b_nodes.index)
+
+    w_3 = self.model.layers[3].get_weights()
+    self.W_nodes_leaves_nn = pd.DataFrame(w_3[0],
+                             index = self.W_nodes_leaves.index,
+                             columns = self.W_nodes_leaves.columns)
+    self.b_leaves_nn = pd.DataFrame(w_3[1],index=self.b_leaves.index)
+
+    w_5 = self.model.layers[5].get_weights()
+    self.W_leaves_out_nn = pd.DataFrame(w_5[0],
+                           index = self.W_leaves_out.index,
+                          columns = self.W_leaves_out.columns)
+    self.b_class_nn = pd.DataFrame(w_5[1],index=self.b_class.index)
 
   def predict_class(self,
                     X,
@@ -172,7 +201,7 @@ if __name__ == "__main__":
   Y_test = np.ones(dataset_length)
   Y_test[0:dataset_length//2] *= 0
 
-  a = dt2nn(clf,2,gammas=[100,100,100])
+  a = dt2nn(clf,2,gammas=[10,10,10])
   a.to_keras()
   print a.score(X_test,Y_test)
   print a.score(X,Y)
@@ -180,4 +209,4 @@ if __name__ == "__main__":
 
   print a.score(X_test, Y_test)
   print a.score(X,Y)
-
+  a.get_weights_from_NN()
