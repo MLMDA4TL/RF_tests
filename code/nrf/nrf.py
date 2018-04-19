@@ -24,7 +24,7 @@ from sklearn.metrics import accuracy_score
 BIAS = 1
 DIM = 0
 class dt2nn:
-  def __init__(self,decision_tree,D,gammas=[1000,1000,1000]):
+  def __init__(self,decision_tree,D,gammas=[10,1,1]):
     self.gammas = gammas
     self.splits = pd.DataFrame(get_list_split_phi(decision_tree)).T
     self.leaves = get_parents_nodes_leaves_dic(decision_tree)
@@ -63,14 +63,18 @@ class dt2nn:
     # Fill class biases
     self.b_class = pd.DataFrame(np.zeros(self.C), index = self.classes)
 
+
+
+
   def to_keras(self,
                dropouts = [0.1,0.1],
-               lr=0.05,
-               decay=1e-5,
-               momentum=0.9,
-               nesterov=True,
                loss='categorical_crossentropy',
-               ):
+               optimizer = optimizers.Adam,
+               optimizer_params = {"lr":0.001,
+                                   "beta_1":0.9,
+                                   "beta_2":0.999,
+                                   "epsilon":1e-8,
+                                   "decay":1e-6}):
     self.input_layer = Input(shape=(self.D,))
     self.nodes_layer = Dense(self.N,
                         activation="tanh")(self.input_layer)
@@ -84,10 +88,7 @@ class dt2nn:
     self.model_nodes = Model(input=self.input_layer, output=self.nodes_layer)
     self.model_leaves = Model(input=self.input_layer, output=self.leaves_layer)
 
-    self.sgd = optimizers.SGD(lr=lr,
-               decay=decay,
-               momentum=momentum,
-               nesterov=nesterov)
+    self.sgd = optimizer(**optimizer_params)
     self.model.compile(loss=loss, optimizer=self.sgd)
 
     self.model.layers[1].set_weights(weights=[self.W_in_nodes,
@@ -167,7 +168,7 @@ if __name__ == "__main__":
   import graphviz 
   import matplotlib.pyplot as plt
   # Build a dataset
-  dataset_length = 100
+  dataset_length = 1000
   D = 2
   X = np.random.randn(dataset_length,D)*0.1
   X[0:dataset_length//2,0] += 0.1
@@ -201,7 +202,7 @@ if __name__ == "__main__":
   Y_test = np.ones(dataset_length)
   Y_test[0:dataset_length//2] *= 0
 
-  a = dt2nn(clf,2,gammas=[10,10,10])
+  a = dt2nn(clf,2,gammas=[10,1,1])
   a.to_keras()
   print a.score(X_test,Y_test)
   print a.score(X,Y)
