@@ -56,6 +56,7 @@ if __name__ == "__main__":
   import matplotlib.pyplot as plt
   from sklearn.tree import DecisionTreeClassifier,export_graphviz
   from sklearn.ensemble import RandomForestClassifier
+  from sklearn.cluster import SpectralClustering
   import seaborn as sns
   dataset_length = 1000
   D = 2
@@ -79,7 +80,7 @@ if __name__ == "__main__":
   splits_based_distance(dt_a, dt_b,gamma=5)
 
   #______ test forests
-  rf = RandomForestClassifier(max_depth=5,n_estimators=10)
+  rf = RandomForestClassifier(max_depth=5,n_estimators=30)
   rf.fit(X, Y)
   similarity_matrix = np.ones((len(rf.estimators_),len(rf.estimators_)))
   for i in range(len(rf.estimators_)-1):
@@ -90,4 +91,6 @@ if __name__ == "__main__":
       similarity_matrix[j,i] = similarity_matrix[i,j]
   sns.clustermap(similarity_matrix)
   plt.show()
+  sc = sklearn.cluster.SpectralClustering(n_clusters=5)
+  sc.fit_predict(similarity_matrix)
 
