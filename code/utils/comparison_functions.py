@@ -55,6 +55,8 @@ if __name__ == "__main__":
   # Build a dataset
   import matplotlib.pyplot as plt
   from sklearn.tree import DecisionTreeClassifier,export_graphviz
+  from sklearn.ensemble import RandomForestClassifier
+  import seaborn as sns
   dataset_length = 1000
   D = 2
   X = np.random.randn(dataset_length,D)*0.1
@@ -75,3 +77,17 @@ if __name__ == "__main__":
   dt_b = DecisionTreeClassifier()
   dt_b = dt_b.fit(X_test, Y_test)
   splits_based_distance(dt_a, dt_b,gamma=5)
+
+  #______ test forests
+  rf = RandomForestClassifier(max_depth=5,n_estimators=10)
+  rf.fit(X, Y)
+  similarity_matrix = np.ones((len(rf.estimators_),len(rf.estimators_)))
+  for i in range(len(rf.estimators_)-1):
+    for j in range(i+1, len(rf.estimators_)):
+      dt_a = rf.estimators_[i]
+      dt_b = rf.estimators_[j]
+      similarity_matrix[i,j] = splits_based_distance(dt_a,dt_b,gamma=10)
+      similarity_matrix[j,i] = similarity_matrix[i,j]
+  sns.clustermap(similarity_matrix)
+  plt.show()
+
