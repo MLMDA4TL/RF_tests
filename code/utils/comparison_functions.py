@@ -4,6 +4,8 @@ import copy
 from collections import OrderedDict 
 from common_functions import get_list_split_phi
 from sklearn.metrics.pairwise import pairwise_distances
+from sklearn.metrics import accuracy_score
+from sklearn.utils.linear_assignment_ import linear_assignment 
 import pandas as pd
 
 
@@ -40,15 +42,34 @@ def splits_based_distance(dt_a, dt_b, distance="manhattan", gamma=5,epsilon=None
 		if thresholds_a.size < thresholds_b.size:
 			axis=1
 		inter = (distances.min(axis=axis)<=epsilon).sum()
-		print inter,thresholds_a.size, thresholds_b.size
 		intersections.append(inter)
 		unions.append(thresholds_a.size + thresholds_b.size - inter)
 	return np.asarray(intersections).sum() *1./ np.asarray(unions).sum()
 
+def CE(y_A,y_B):
+    confusion_matrix = pd.crosstab(y_A,y_B)
+    best_A_B_couples = linear_assignment(-confusion_matrix)
+    return sum([confusion_matrix.iloc[couple[0],couple[1]] for couple in best_A_B_couples])*1./sum(confusion_matrix.sum(0))
 
+def CE_based_comparison(dt_a, dt_b, X):
+	leafs_ids_a = dt_a.apply(X)
+	leafs_ids_b = dt_b.apply(X)
+	return CE(leafs_ids_a,leafs_ids_b)
 
+def accuracy_based_distance(dt_a, dt_b, X):
+	y_a = dt_a.predict(X)
+	y_b = dt_b.predict(X)
+	return accuracy_score(y_a, y_b)
 
-
+def compare_trees_from_forest(rf, similarity_function, **params):
+	similarity_matrix = np.ones((len(rf.estimators_),len(rf.estimators_)))
+	for i in range(len(rf.estimators_)-1):
+		for j in range(i+1, len(rf.estimators_)):
+			dt_a = rf.estimators_[i]
+			dt_b = rf.estimators_[j]
+			similarity_matrix[i,j] = similarity_function(dt_a,dt_b, **params)
+			similarity_matrix[j,i] = similarity_matrix[i,j]
+	return similarity_matrix
 
 if __name__ == "__main__":
   # Build a dataset
@@ -79,17 +100,30 @@ if __name__ == "__main__":
   splits_based_distance(dt_a, dt_b,gamma=5)
 
   #______ test forests
-  rf = RandomForestClassifier(max_depth=5,n_estimators=30)
+  rf = RandomForestClassifier(max_depth=5,n_estimators=100)
   rf.fit(X, Y)
-  similarity_matrix = np.ones((len(rf.estimators_),len(rf.estimators_)))
-  for i in range(len(rf.estimators_)-1):
-    for j in range(i+1, len(rf.estimators_)):
-      dt_a = rf.estimators_[i]
-      dt_b = rf.estimators_[j]
-      similarity_matrix[i,j] = splits_based_distance(dt_a,dt_b,gamma=10)
-      similarity_matrix[j,i] = similarity_matrix[i,j]
-  sns.clustermap(similarity_matrix)
+  similarity_matrix_splits = compare_trees_from_forest(rf, splits_based_distance, gamma=10)
+  similarity_matrix_accuracy = compare_trees_from_forest(rf, accuracy_based_distance,X=X)
+  similarity_matrix_ce = compare_trees_from_forest(rf, CE_based_comparison, X=X)
+  sns.clustermap(similarity_matrix_splits,method="ward")
   plt.show()
-  sc = SpectralClustering(n_clusters=5)
-  sc.fit_predict(similarity_matrix)
+  sns.clustermap(similarity_matrix_accuracy,method="ward")
+  plt.show()
+  sns.clustermap(similarity_matrix_ce,method="ward")
+  plt.show()
 
+  sc = SpectralClustering(n_clusters=10)
+  clusters_accuracy = sc.fit_predict(similarity_matrix_accuracy)
+
+  sc = SpectralClustering(n_clusters=10)
+  clusters_ce = sc.fit_predict(similarity_matrix_ce)
+
+  sc = SpectralClustering(n_clusters=10)
+  clusters_splits = sc.fit_predict(similarity_matrix_splits)
+
+  plt.imshow(pd.crosstab(clusters_splits,clusters_ce))
+  plt.show()
+  plt.imshow(pd.crosstab(clusters_splits,clusters_accuracy))
+  plt.show()
+  plt.imshow(pd.crosstab(clusters_accuracy,clusters_ce))
+  plt.show()
