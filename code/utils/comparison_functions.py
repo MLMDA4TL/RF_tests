@@ -49,7 +49,6 @@ def splits_based_distance(dt_a, dt_b, distance="manhattan", gamma=5,epsilon=None
 
 
 
-group_splits_by_feature(get_list_split_phi(clf))
 
 if __name__ == "__main__":
   # Build a dataset
@@ -91,6 +90,6 @@ if __name__ == "__main__":
       similarity_matrix[j,i] = similarity_matrix[i,j]
   sns.clustermap(similarity_matrix)
   plt.show()
-  sc = sklearn.cluster.SpectralClustering(n_clusters=5)
+  sc = SpectralClustering(n_clusters=5)
   sc.fit_predict(similarity_matrix)
 
