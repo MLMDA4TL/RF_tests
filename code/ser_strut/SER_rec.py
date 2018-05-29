@@ -331,29 +331,35 @@ def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = N
 
     # Si c'est une feuille
     if dTree.tree_.feature[node] == -2:
-#        if no_red:
-#            if np.sum(dTree.tree_.value[node,:]) >0 and np.argmax(dTree.tree_.value[node,:]) not in cl_no_red :
-#                DT_to_add = sklearn.tree.DecisionTreeClassifier()
-#                # to make a complete tree
-#                DT_to_add.min_impurity_split = 0
-#                DT_to_add.fit( X_target_node, y_target_node)
-#                fusionDecisionTree(dTree, node, DT_to_add)
-#            else:
-#                print('Feuille laissée intacte')
-#            return node
-#
-#        else:
-            #Si elle n'est pas déjà pure
-            if ( len(set(list(y_target_node))) > 1 ) :
-                # build full new tree from f
+        if no_red:
+            if np.sum(dTree.tree_.value[node,:]) >0 and np.argmax(dTree.tree_.value[node,:]) not in cl_no_red :
                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
                 # to make a complete tree
-                DT_to_add.min_impurity_split = 0
+                try:
+                    DT_to_add.min_impurity_decrease = 0
+                except:
+                    DT_to_add.min_impurity_split = 0
                 DT_to_add.fit( X_target_node, y_target_node)
                 fusionDecisionTree(dTree, node, DT_to_add)
-
-                
+            else:
+                print('Feuille laissée intacte')
             return node
+#
+        else:
+             #Si elle n'est pas déjà pure
+             if ( len(set(list(y_target_node))) > 1 ) :
+                 # build full new tree from f
+                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
+                 # to make a complete tree
+                 try:
+                     DT_to_add.min_impurity_decrease = 0
+                 except:
+                     DT_to_add.min_impurity_split = 0
+                 DT_to_add.fit( X_target_node, y_target_node)
+                 fusionDecisionTree(dTree, node, DT_to_add)
+
+                 
+    return node
     
     #Si ce n'est pas une feuille
 
