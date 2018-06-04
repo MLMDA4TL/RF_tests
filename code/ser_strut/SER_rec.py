@@ -305,7 +305,7 @@ def cut_into_leaf2(dTree, node):
 
     return inds.index(node)
     
-def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = None):
+def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl = False, cl_no_red = None, no_ser_on_cl=False, cl_no_ser=None):
     
     #Maj values
     #old_val = dTree.tree_.value[node]
@@ -316,7 +316,7 @@ def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = N
         
     old_size_cl_no_red = np.sum(dTree.tree_.value[node][:,cl_no_red])
     
-    if no_red and dTree.tree_.feature[node] == -2 and y_target_node.size == 0  and old_size_cl_no_red > 0: 
+    if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0  and old_size_cl_no_red > 0: 
         v = np.zeros((dTree.n_outputs_,dTree.n_classes_))
         val[:,cl_no_red] = dTree.tree_.value[node][:,cl_no_red]
         
@@ -331,8 +331,8 @@ def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = N
 
     # Si c'est une feuille
     if dTree.tree_.feature[node] == -2:
-        if no_red:
-            if np.sum(dTree.tree_.value[node,:]) >0 and np.argmax(dTree.tree_.value[node,:]) not in cl_no_red :
+        if no_ser_on_cl:
+            if np.sum(dTree.tree_.value[node,:]) >0 and np.argmax(dTree.tree_.value[node,:]) not in cl_no_ser :
                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
                 # to make a complete tree
                 try:
@@ -343,23 +343,22 @@ def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = N
                 fusionDecisionTree(dTree, node, DT_to_add)
             else:
                 print('Feuille laissée intacte')
-            return node
 #
         else:
-             #Si elle n'est pas déjà pure
-             if ( len(set(list(y_target_node))) > 1 ) :
-                 # build full new tree from f
-                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
-                 # to make a complete tree
-                 try:
-                     DT_to_add.min_impurity_decrease = 0
-                 except:
-                     DT_to_add.min_impurity_split = 0
-                 DT_to_add.fit( X_target_node, y_target_node)
-                 fusionDecisionTree(dTree, node, DT_to_add)
+            #Si elle n'est pas déjà pure
+            if ( len(set(list(y_target_node))) > 1 ) :
+                # build full new tree from f
+                DT_to_add = sklearn.tree.DecisionTreeClassifier()
+                # to make a complete tree
+                try:
+                    DT_to_add.min_impurity_decrease = 0
+                except:
+                    DT_to_add.min_impurity_split = 0
+                DT_to_add.fit( X_target_node, y_target_node)
+                fusionDecisionTree(dTree, node, DT_to_add)
 
                  
-    return node
+        return node
     
     #Si ce n'est pas une feuille
 
@@ -376,10 +375,14 @@ def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = N
     y_target_node_right = y_target_node[ind_right]
 
     #<----- CHGT STRUCTURE :"node" DOIT CHANGER ( OK REC )
-    new_node_left = SER(dTree.tree_.children_left[node],dTree,X_target_node_left,y_target_node_left, no_red = no_red, cl_no_red = cl_no_red) 
+    new_node_left = SER(dTree.tree_.children_left[node],dTree,X_target_node_left,y_target_node_left,
+            no_red_on_cl = no_red_on_cl, cl_no_red = cl_no_red,
+            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser) 
     dic = dTree.tree_.__getstate__().copy()
     node,b = find_parent(dic,new_node_left)
-    new_node_right = SER(dTree.tree_.children_right[node],dTree,X_target_node_right,y_target_node_right, no_red = no_red, cl_no_red = cl_no_red)
+    new_node_right = SER(dTree.tree_.children_right[node],dTree,X_target_node_right,y_target_node_right,
+            no_red_on_cl = no_red_on_cl, cl_no_red = cl_no_red,
+            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser) 
     dic = dTree.tree_.__getstate__().copy()
     node, b = find_parent(dic, new_node_right)
 
@@ -396,7 +399,7 @@ def SER(node, dTree, X_target_node, y_target_node, no_red = False, cl_no_red = N
 
     if dTree.tree_.feature[node] != -2:
         #Normalement, on passe sur un noeud atteint ( donc les 2 pas zero simult.)
-        if no_red:
+        if no_red_on_cl:
             if ind_left.size and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
                 node = cut_from_left_right(dTree, node, -1)
         
@@ -441,7 +444,7 @@ def add_to_child(dTree, node, values):
 def  bootstrap(size):
     return np.random.choice( np.linspace(0,size-1,size).astype(int), size, replace = True )
 
-def SER_RF(random_forest, X_target, y_target, bootstrap_ = False, no_red = False, cl_no_red = None):
+def SER_RF(random_forest, X_target, y_target, bootstrap_ = False, no_red_on_cl = False, cl_no_red = None, no_ser_on_cl=False, cl_no_ser=None):
     rf_ser = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_ser.estimators_):
         print("tree n° ", i)
@@ -450,5 +453,7 @@ def SER_RF(random_forest, X_target, y_target, bootstrap_ = False, no_red = False
         if bootstrap_:
             inds = bootstrap(y_target.size)
             
-        SER(0,rf_ser.estimators_[i], X_target[inds], y_target[inds],no_red = no_red, cl_no_red = cl_no_red)
+        SER(0,rf_ser.estimators_[i], X_target[inds], y_target[inds],
+                no_red_on_cl = no_red_on_cl, cl_no_red = cl_no_red,
+                no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
     return rf_ser
