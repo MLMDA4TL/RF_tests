@@ -2,7 +2,7 @@
 """
 @author: sergio
 """
-
+import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier,export_graphviz
 from sklearn.ensemble import RandomForestClassifier
@@ -18,16 +18,17 @@ from keras import optimizers
 from sklearn.preprocessing import LabelEncoder
 from keras.utils import to_categorical
 from sklearn.metrics import accuracy_score
-
+from keras.regularizers import l1
 BIAS = 1
 DIM = 0
 
 
 class ndt:
-  def __init__(self,D,gammas=[10,1,1],tree_id=None):
+  def __init__(self,D,gammas=[10,1,1],tree_id=None,sigma=0):
     self.gammas = gammas
     self.D = D
     self.tree_id = tree_id
+    self.sigma = sigma
 
   def compute_matrices_and_biases(self, decision_tree):
     self.splits = pd.DataFrame(get_list_split_phi(decision_tree)).T
@@ -95,6 +96,7 @@ class ndt:
                dropouts = [0.1,0.1,0.1],
                loss='categorical_crossentropy',
                optimizer = optimizers.Adam,
+               kernel_regularizer=[l1(0),l1(0),l1(0)],
                optimizer_params = {"lr":0.001,
                                    "beta_1":0.9,
                                    "beta_2":0.999,
@@ -104,15 +106,20 @@ class ndt:
     self.drop_input_layer = Dropout(dropouts[0])(self.input_layer)
 
     self.nodes_layer = Dense(self.N,
-                        activation="tanh")(self.drop_input_layer)
+                        activation="tanh",
+                        kernel_regularizer=kernel_regularizer[0])(self.drop_input_layer)
 
     self.drop_nodes_layer = Dropout(dropouts[1])(self.nodes_layer)
 
     self.leaves_layer = Dense(self.L,
-                        activation="tanh")(self.drop_nodes_layer)
+                        activation="tanh",
+                        kernel_regularizer=kernel_regularizer[1])(self.drop_nodes_layer)
+    
     self.drop_nodes_layer = Dropout(dropouts[2])(self.leaves_layer)
 
-    self.output_layer = Dense(self.C, activation='softmax')(self.drop_nodes_layer)
+    self.output_layer = Dense(self.C,
+                              activation='softmax',
+                              kernel_regularizer=kernel_regularizer[2])(self.drop_nodes_layer)
 
     self.model = Model(input=self.input_layer, output=self.output_layer)
     self.model_nodes = Model(input=self.input_layer, output=self.nodes_layer)
@@ -120,14 +127,17 @@ class ndt:
 
     self.sgd = optimizer(**optimizer_params)
     self.model.compile(loss=loss, optimizer=self.sgd)
-    print self.model.summary()
+    
+    flat_b_nodes = self.b_nodes.values.flatten()
+    flat_b_leaves = self.b_leaves.values.flatten()
+    flat_b_class = self.b_class.values.flatten()
 
-    self.model.layers[2].set_weights(weights=[self.W_in_nodes,
-                                             self.b_nodes.values.flatten()])
-    self.model.layers[4].set_weights(weights=[self.W_nodes_leaves,
-                                             self.b_leaves.values.flatten()])
-    self.model.layers[6].set_weights(weights=[self.W_leaves_out,
-                                              self.b_class.values.flatten()])
+    self.model.layers[2].set_weights(weights=[self.W_in_nodes+np.random.randn(*self.W_in_nodes.shape)*self.sigma,
+                                             flat_b_nodes+np.random.randn(*flat_b_nodes.shape)*self.sigma])
+    self.model.layers[4].set_weights(weights=[self.W_nodes_leaves+np.random.randn(*self.W_nodes_leaves.shape)*self.sigma,
+                                             flat_b_leaves+np.random.randn(*flat_b_leaves.shape)*self.sigma])
+    self.model.layers[6].set_weights(weights=[self.W_leaves_out+np.random.randn(*self.W_leaves_out.shape)*self.sigma,
+                                              flat_b_class+np.random.randn(*flat_b_class.shape)*self.sigma])
 
   def fit(self,
           X,
@@ -164,43 +174,37 @@ class ndt:
   def get_weights_from_NN(self):
     w_2 = self.model.layers[2].get_weights()
                        
-    self.W_in_nodes_nn = pd.DataFrame(w_1[0],
+    self.W_in_nodes_nn = pd.DataFrame(w_2[0],
                          index = self.W_in_nodes.index,
                          columns = self.W_in_nodes.columns)
-    self.b_nodes_nn = pd.DataFrame(w_1[1],
+    self.b_nodes_nn = pd.DataFrame(w_2[1],
                                 index=self.b_nodes.index,
                                 columns=self.b_nodes.columns)
 
     w_4 = self.model.layers[4].get_weights()
-    self.W_nodes_leaves_nn = pd.DataFrame(w_3[0],
+    self.W_nodes_leaves_nn = pd.DataFrame(w_4[0],
                              index = self.W_nodes_leaves.index,
                              columns = self.W_nodes_leaves.columns)
-    self.b_leaves_nn = pd.DataFrame(w_3[1],
+    self.b_leaves_nn = pd.DataFrame(w_4[1],
                                     index=self.b_leaves.index,
                                     columns=self.b_leaves.columns)
 
     w_6 = self.model.layers[6].get_weights()
-    self.W_leaves_out_nn = pd.DataFrame(w_5[0],
+    self.W_leaves_out_nn = pd.DataFrame(w_6[0],
                                         index = self.W_leaves_out.index,
                                         columns = self.W_leaves_out.columns)
-    self.b_class_nn = pd.DataFrame(w_5[1],
+    self.b_class_nn = pd.DataFrame(w_6[1],
                                    index=self.b_class.index,
                                    columns=self.b_class.columns)
 
   def compute_weights_differences(self):
     self.get_weights_from_NN()
-    diff_W_in_nodes = self.W_in_nodes - self.W_in_nodes_nn
-    diff_b_nodes = self.b_nodes - self.b_nodes_nn
-    diff_W_nodes_leaves = self.W_nodes_leaves - self.W_nodes_leaves_nn
-    diff_b_leaves = self.b_leaves - self.b_leaves_nn
-    diff_W_leaves_output = self.W_leaves_out - self.W_leaves_out_nn
-    diff_b_class = self.b_class - self.b_class_nn
-    return diff_W_in_nodes,\
-           diff_b_nodes,\
-           diff_W_nodes_leaves,\
-           diff_b_leaves,\
-           diff_W_leaves_output,\
-           diff_b_class
+    self.diff_W_in_nodes = self.W_in_nodes - self.W_in_nodes_nn
+    self.diff_b_nodes = self.b_nodes - self.b_nodes_nn
+    self.diff_W_nodes_leaves = self.W_nodes_leaves - self.W_nodes_leaves_nn
+    self.diff_b_leaves = self.b_leaves - self.b_leaves_nn
+    self.diff_W_leaves_output = self.W_leaves_out - self.W_leaves_out_nn
+    self.diff_b_class = self.b_class - self.b_class_nn
 
   def predict_class(self,
                     X,
@@ -212,6 +216,73 @@ class ndt:
             X,
             y):
     return accuracy_score(self.predict_class(X),y)
+
+  def plot_differences(self):
+    if "diff_W_in_nodes" not in dir(self):
+      self.compute_weights_differences()
+    fig=plt.figure(figsize=(3, 2))
+    columns = 3
+    rows = 2
+    ax1a = fig.add_subplot(rows, columns, 1)
+    plt.imshow(self.diff_W_in_nodes,aspect="auto",cmap="gray")
+    ax1a.set_title("diff W in nodes")
+
+    ax2a = fig.add_subplot(rows, columns, 2)
+    plt.imshow(self.diff_b_nodes,aspect="auto",cmap="gray")
+    ax2a.set_title("diff b nodes")
+
+    ax3a = fig.add_subplot(rows, columns, 3)
+    plt.imshow(self.diff_W_nodes_leaves,aspect="auto",cmap="gray")
+    ax3a.set_title("diff W nodes leaves")
+
+    ax4a = fig.add_subplot(rows, columns, 4)
+    plt.imshow(self.diff_b_leaves,aspect="auto",cmap="gray")
+    ax4a.set_title("diff b leaves")
+
+    ax5a = fig.add_subplot(rows, columns, 5)
+    plt.imshow(self.diff_W_leaves_output,aspect="auto",cmap="gray")
+    ax5a.set_title("diff W leaves out")
+
+    ax6a = fig.add_subplot(rows, columns, 6)
+    plt.imshow(self.diff_b_class,aspect="auto",cmap="gray")
+    ax6a.set_title("diff b class")  
+    plt.show()
+
+  def plot_W_nn_quantiles(self,quantiles = np.arange(0,99.999,0.001)):
+    fig=plt.figure(figsize=(3, 2))
+    columns = 3
+    rows = 2
+    ax1a = fig.add_subplot(rows, columns, 1)
+    plt.plot(quantiles,np.percentile(self.W_in_nodes_nn,quantiles))
+    plt.plot(quantiles,np.percentile(self.W_in_nodes,quantiles))
+    ax1a.set_title("W in nodes")
+
+    ax2a = fig.add_subplot(rows, columns, 2)
+    plt.plot(quantiles,np.percentile(self.b_nodes_nn,quantiles))
+    plt.plot(quantiles,np.percentile(self.b_nodes,quantiles))
+    ax2a.set_title("b nodes")
+
+    ax3a = fig.add_subplot(rows, columns, 3)
+    plt.plot(quantiles,np.percentile(self.W_nodes_leaves_nn,quantiles))
+    plt.plot(quantiles,np.percentile(self.W_nodes_leaves,quantiles))
+    ax3a.set_title("W nodes leaves")
+
+    ax4a = fig.add_subplot(rows, columns, 4)
+    plt.plot(quantiles,np.percentile(self.b_leaves_nn,quantiles))
+    plt.plot(quantiles,np.percentile(self.b_leaves,quantiles))
+    ax4a.set_title("b leaves")
+
+    ax5a = fig.add_subplot(rows, columns, 5)
+    plt.plot(quantiles,np.percentile(self.W_leaves_out_nn,quantiles))
+    plt.plot(quantiles,np.percentile(self.W_leaves_out,quantiles))
+    ax5a.set_title("W leaves out")
+
+    ax6a = fig.add_subplot(rows, columns, 6)
+    plt.plot(quantiles,np.percentile(self.b_class_nn,quantiles))
+    plt.plot(quantiles,np.percentile(self.b_class,quantiles))
+    ax6a.set_title("b class")  
+    plt.show()    
+
 
   def print_tree_weights(self):
     print("W: Input -> Nodes")
@@ -241,12 +312,59 @@ class ndt:
     print("b: Leaves -> Out")
     print(self.b_class_nn)
 
+  def plot_old_new_network(self):
+    if "W_in_nodes" not in dir(self):
+      self.get_weights_from_NN()
+    fig=plt.figure(figsize=(6, 2))
+    columns = 6
+    rows = 2
+    ax1a = fig.add_subplot(rows, columns, 1)
+    plt.imshow(self.W_in_nodes,aspect="auto",cmap="gray")
+    ax1a.set_title("W in nodes")
+    ax1b = fig.add_subplot(rows, columns, 2)
+    plt.imshow(self.W_in_nodes_nn,aspect="auto",cmap="gray")
+    ax1b.set_title("W in nodes nn")
 
+    ax2a = fig.add_subplot(rows, columns, 3)
+    plt.imshow(self.b_nodes,aspect="auto",cmap="gray")
+    ax2a.set_title("b nodes ")
+    ax2b = fig.add_subplot(rows, columns, 4)
+    plt.imshow(self.b_nodes_nn,aspect="auto",cmap="gray")
+    ax2b.set_title("b nodes nn")
+
+    ax3a = fig.add_subplot(rows, columns, 5)
+    plt.imshow(self.W_nodes_leaves,aspect="auto",cmap="gray")
+    ax3a.set_title("W nodes leaves")
+    ax3b = fig.add_subplot(rows, columns, 6)
+    plt.imshow(self.W_nodes_leaves_nn,aspect="auto",cmap="gray")
+    ax3b.set_title("W nodes leaves nn")
+
+    ax4a = fig.add_subplot(rows, columns, 7)
+    plt.imshow(self.b_leaves,aspect="auto",cmap="gray")
+    ax4a.set_title("b leaves")
+    ax4b = fig.add_subplot(rows, columns, 8)
+    plt.imshow(self.b_leaves_nn,aspect="auto",cmap="gray")
+    ax4b.set_title("b leaves nn")
+
+    ax5a = fig.add_subplot(rows, columns, 9)
+    plt.imshow(self.W_leaves_out,aspect="auto",cmap="gray")
+    ax5a.set_title("W leaves out")
+    ax5b = fig.add_subplot(rows, columns, 10)
+    plt.imshow(self.W_leaves_out_nn,aspect="auto",cmap="gray")
+    ax5b.set_title("W leaves out nn")
+
+    ax6a = fig.add_subplot(rows, columns, 11)
+    plt.imshow(self.b_class,aspect="auto",cmap="gray")
+    ax6a.set_title("b class")
+    ax6b = fig.add_subplot(rows, columns, 12)
+    plt.imshow(self.b_class_nn,aspect="auto",cmap="gray")
+    ax6b.set_title("b class nn")    
+    plt.show()
 
 if __name__ == "__main__":
   # Build a dataset
   import matplotlib.pyplot as plt
-  dataset_length = 1000
+  dataset_length = 10000
   D = 2
   X = np.random.randn(dataset_length,D)*0.1
   X[0:dataset_length//2,0] += 0.1
@@ -260,16 +378,19 @@ if __name__ == "__main__":
   Y_test = np.ones(dataset_length)
   Y_test[0:dataset_length//2] *= 0
   # Train a Tree
-  clf = DecisionTreeClassifier()
+  clf = DecisionTreeClassifier(max_depth=20)
   clf = clf.fit(X, Y)
 
   a = ndt(D=2,gammas=[10,1,1],tree_id=0)
   a.compute_matrices_and_biases(clf)
-  a.to_keras()
+  a.to_keras(dropouts=[0.1,0.5,0.5])
   print "scores before training"
   print a.score(X_test,Y_test)
   print a.score(X,Y)
-  errors = a.fit(X,Y)
+
+  print clf.score(X_test,Y_test)
+  print clf.score(X,Y)
+  errors = a.fit(X,Y,epochs=1000)
   print "scores after training"
   print a.score(X_test, Y_test)
   print a.score(X,Y)
@@ -278,9 +399,8 @@ if __name__ == "__main__":
   a.print_tree_weights()
   print "NN weights"
   a.print_nn_weights()
-  print "activations"
-  print a.get_activations(X)
+  #print "activations"
+  #print a.get_activations(X)
   differences = a.compute_weights_differences()
-  for diff in differences:
-    plt.imshow(diff)
-    plt.show()
+
+

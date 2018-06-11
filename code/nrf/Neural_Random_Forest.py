@@ -20,12 +20,12 @@ from keras import optimizers
 from sklearn.preprocessing import LabelEncoder
 from keras.utils import to_categorical
 from sklearn.metrics import accuracy_score
-
+from keras.regularizers import l2,l1
 
 
 class nrf_fully_connected(ndt):
-  def __init__(self, D, gammas=[10,1,1,1]):
-    ndt.__init__(self, D, gammas)
+  def __init__(self, D, gammas=[10,1,1,1],kernel_regularizer=[l1(0),l1(0),l1(0)],sigma=0):
+    ndt.__init__(self, D, gammas,kernel_regularizer,sigma)
 
   def compute_matrices_and_biases(self, random_forest):
     self.rf = random_forest
@@ -126,6 +126,7 @@ class nrf_independent_ndt(ndt):
     print(self.b_class_nn)    
 
 if __name__ == "__main__":
+  np.random.seed(0)
   import matplotlib.pyplot as plt
   dataset_length = 1000
   D = 2
@@ -144,24 +145,34 @@ if __name__ == "__main__":
   rf = RandomForestClassifier(max_depth=5,n_estimators=10)
   rf.fit(X, Y)
 
-  a = nrf_fully_connected(D=2,gammas=[10,1,1])
+  a = nrf_fully_connected(D=2,gammas=[10,1,1],sigma=0.)
   a.compute_matrices_and_biases(rf)
-  a.to_keras()
+  l1_coef = -4
+  a.to_keras(kernel_regularizer=[l1(10**l1_coef),l1(10**l1_coef),l1(10**l1_coef)],
+             dropouts = [0.1,0.5,0.5])
   print "scores before training"
   print a.score(X_test,Y_test)
   print a.score(X,Y)
-  errors = a.fit(X,Y)
+  errors = a.fit(X,Y,epochs=100)
+  plt.plot(errors)
+  plt.show()
   print "scores after training"
   print a.score(X_test, Y_test)
   print a.score(X,Y)
+  print "scores forest"
+  print a.rf.score(X_test, Y_test)
+  print a.rf.score(X,Y)
   a.get_weights_from_NN()
-  print "Tree weights"
-  a.print_tree_weights()
-  print "NN weights"
-  a.print_nn_weights()
-  print "activations"
-  print a.get_activations(X)
+
+  #print "Tree weights"
+  #a.print_tree_weights()
+  #print "NN weights"
+  #a.print_nn_weights()
+  #print "activations"
+  #print a.get_activations(X)
   differences = a.compute_weights_differences()
-  for diff in differences:
-    plt.imshow(diff)
-    plt.show()
+  a.plot_old_new_network()
+  a.plot_differences()
+  a.plot_W_nn_quantiles()
+
+
