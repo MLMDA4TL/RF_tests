@@ -21,7 +21,9 @@ from sklearn.metrics import accuracy_score
 from keras.regularizers import l1
 BIAS = 1
 DIM = 0
-
+RIGHT = 1
+LEFT = -1
+LEAVES = -1
 
 class ndt:
   def __init__(self,D,gammas=[10,1,1],tree_id=None,sigma=0):
@@ -40,7 +42,8 @@ class ndt:
                                    index = list(range(self.D)),
                                    columns = self.splits.index)
     for node, dim in self.splits[DIM].iteritems():
-      self.W_in_nodes.loc[dim,node] = 1.*self.gammas[0]
+      self.W_in_nodes.loc[dim,node] = 1.
+    self.W_in_nodes *= self.gammas[0]
     # Fill Input -> Nodes layer biases
     self.b_nodes = pd.DataFrame(- self.splits[BIAS]*self.gammas[0])
     self.b_nodes.columns = ["NODES_BIASES"]
@@ -281,7 +284,117 @@ class ndt:
     plt.plot(quantiles,np.percentile(self.b_class_nn,quantiles))
     plt.plot(quantiles,np.percentile(self.b_class,quantiles))
     ax6a.set_title("b class")  
-    plt.show()    
+    plt.show()
+
+  def neural_network_to_tree(self,node_leaves_matrix=None, threshold=0.9):
+    def insert_node(parent,
+                    right_left,
+                    children_right,
+                    children_left,
+                    node_leaves_matrix,
+                    threshold):
+      """
+      print "_____________"
+      print "parent",parent
+      print "right_left",right_left
+      print "nodes_leaves_sum"
+      print node_leaves_matrix
+      """
+
+      # Find parent's child
+      node_leaves_matrix = node_leaves_matrix[np.abs(node_leaves_matrix).sum(axis=1)>0]
+      count_nb_leaves = np.abs(node_leaves_matrix).sum(axis=1)
+      
+      child = count_nb_leaves.argmax()
+      #print "child",child,count_nb_leaves[child]
+
+      
+      # Remaining nodes are those that have at least one leaf
+      remaining_nodes = list(count_nb_leaves.index[count_nb_leaves>0])
+      """
+      print "nodes_leaves_sum"
+      print np.abs(node_leaves_matrix).sum(axis=1)
+      print "remaining nodes"
+      print remaining_nodes
+      """
+      # Add child to tree
+      if parent is not None:
+        if right_left == RIGHT:
+          children_right[parent] = child
+        elif right_left == LEFT:
+          children_left[parent] = child
+
+      # get leaves of current child
+      current_node_leaves = node_leaves_matrix.loc[child]
+      #print "current node leaves"
+      #print current_node_leaves
+      # Remove nodes that have been already included
+      if parent in remaining_nodes:
+        remaining_nodes.remove(parent)
+      if child in remaining_nodes:
+        remaining_nodes.remove(child)
+
+      if remaining_nodes:
+        node_leaves_matrix = node_leaves_matrix.loc[remaining_nodes]
+      leaves = node_leaves_matrix.columns
+      right_leaves = leaves[(current_node_leaves >= threshold).values]
+      left_leaves = leaves[(current_node_leaves <= -threshold).values]
+      """
+      print "leaves", leaves
+      print "right_leaves", right_leaves 
+      print "left_leaves", left_leaves
+      """
+      # Apply the same method to right and left children 
+      right_node_leaves_matrix = None
+      if len(remaining_nodes):
+        right_node_leaves_matrix = node_leaves_matrix[right_leaves]
+        if np.abs(right_node_leaves_matrix).sum().sum() == 0:
+          right_node_leaves_matrix = None
+        else:
+          insert_node(child,
+                      RIGHT,
+                      children_right,
+                      children_left,
+                      right_node_leaves_matrix,
+                      threshold)
+      if right_node_leaves_matrix is None:
+        children_right[child] = right_leaves[0]
+        if len(right_leaves) > 1:
+          print "more than one leaf",right_leaves
+        #print "adding to", child, "children right",right_leaves 
+      left_node_leaves_matrix = None
+
+      if len(remaining_nodes):
+        left_node_leaves_matrix = node_leaves_matrix[left_leaves]
+        if np.abs(left_node_leaves_matrix).sum().sum() == 0:
+          left_node_leaves_matrix = None
+        else:
+          insert_node(child,
+                      LEFT,
+                      children_right,
+                      children_left,
+                      left_node_leaves_matrix,
+                      threshold)
+
+      if left_node_leaves_matrix is None:
+        children_left[child] = left_leaves[0]
+        if len(left_leaves) > 1:
+          print "more than one leaf",left_leaves
+        #print "adding to", child, "children left",left_leaves 
+
+    if node_leaves_matrix is None:
+      node_leaves_matrix = self.W_nodes_leaves
+    children_right = pd.Series(LEAVES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
+    children_left = pd.Series(LEAVES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
+    insert_node(None,
+                None,
+                children_right,
+                children_left,
+                node_leaves_matrix,
+                threshold)
+    return children_right, children_left
+
+
 
 
   def print_tree_weights(self):
@@ -378,19 +491,30 @@ if __name__ == "__main__":
   Y_test = np.ones(dataset_length)
   Y_test[0:dataset_length//2] *= 0
   # Train a Tree
-  clf = DecisionTreeClassifier(max_depth=20)
+  clf = DecisionTreeClassifier(max_depth=5)
   clf = clf.fit(X, Y)
 
   a = ndt(D=2,gammas=[10,1,1],tree_id=0)
   a.compute_matrices_and_biases(clf)
-  a.to_keras(dropouts=[0.1,0.5,0.5])
+  #a.to_keras(dropouts=[0.1,0.5,0.5])
+  children_right, children_left = a.neural_network_to_tree()
+  children_right.index = [int(val.split("_")[-1]) for val in children_right.index]
+  children_right = children_right.sort_index()
+  children_left.index = [int(val.split("_")[-1]) for val in children_left.index]
+  children_left = children_left.sort_index()
+
+  np.savetxt("left_true.csv",clf.tree_.children_left.astype(int), fmt='%i')
+  np.savetxt("right_true.csv",clf.tree_.children_right.astype(int), fmt='%i')
+  children_left.to_csv("try_left.csv")
+  children_right.to_csv("try_right.csv")
+
   print "scores before training"
   print a.score(X_test,Y_test)
   print a.score(X,Y)
 
   print clf.score(X_test,Y_test)
   print clf.score(X,Y)
-  errors = a.fit(X,Y,epochs=1000)
+  errors = a.fit(X,Y,epochs=100)
   print "scores after training"
   print a.score(X_test, Y_test)
   print a.score(X,Y)
