@@ -24,6 +24,8 @@ DIM = 0
 RIGHT = 1
 LEFT = -1
 LEAVES = -1
+LEAVES_THRESHOLDS = -2
+LEAVES_FEATURES = -2
 
 class ndt:
   def __init__(self,D,gammas=[10,1,1],tree_id=None,sigma=0):
@@ -286,7 +288,7 @@ class ndt:
     ax6a.set_title("b class")  
     plt.show()
 
-  def neural_network_to_tree(self,node_leaves_matrix=None, threshold=0.9):
+  def neural_network_to_tree(self,node_leaves_matrix=None,in_nodes_matrix=None,nodes_biases=None,threshold=0.9):
     def insert_node(parent,
                     right_left,
                     children_right,
@@ -308,7 +310,6 @@ class ndt:
       child = count_nb_leaves.argmax()
       #print "child",child,count_nb_leaves[child]
 
-      
       # Remaining nodes are those that have at least one leaf
       remaining_nodes = list(count_nb_leaves.index[count_nb_leaves>0])
       """
@@ -384,15 +385,30 @@ class ndt:
 
     if node_leaves_matrix is None:
       node_leaves_matrix = self.W_nodes_leaves
+    if in_nodes_matrix is None:
+      in_nodes_matrix = self.W_in_nodes
+    if nodes_biases is None:
+      nodes_biases = self.b_nodes
+
     children_right = pd.Series(LEAVES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
     children_left = pd.Series(LEAVES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
+    thresholds = pd.Series(LEAVES_THRESHOLDS,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
+    features = pd.Series(LEAVES_FEATURES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
+
     insert_node(None,
                 None,
                 children_right,
                 children_left,
                 node_leaves_matrix,
-                threshold)
-    return children_right, children_left
+                threshold*self.gammas[1])
+    # Compute the threshold of each node
+    #print features
+    #print thresholds
+    #print nodes_biases
+    thresholds[nodes_biases.index] = nodes_biases["NODES_BIASES"]*1./self.gammas[0]
+    # Retrieve the most important feature for each node (one could imagine to create new features if necessary)
+    features[in_nodes_matrix.columns] = in_nodes_matrix.index[in_nodes_matrix.values.argmax(axis=0)]
+    return children_right, children_left, thresholds, features
 
 
 
@@ -491,22 +507,31 @@ if __name__ == "__main__":
   Y_test = np.ones(dataset_length)
   Y_test[0:dataset_length//2] *= 0
   # Train a Tree
-  clf = DecisionTreeClassifier(max_depth=5)
+  clf = DecisionTreeClassifier(max_depth=20)
   clf = clf.fit(X, Y)
 
   a = ndt(D=2,gammas=[10,1,1],tree_id=0)
   a.compute_matrices_and_biases(clf)
   #a.to_keras(dropouts=[0.1,0.5,0.5])
-  children_right, children_left = a.neural_network_to_tree()
+  children_right, children_left, thresholds, features = a.neural_network_to_tree()
   children_right.index = [int(val.split("_")[-1]) for val in children_right.index]
   children_right = children_right.sort_index()
   children_left.index = [int(val.split("_")[-1]) for val in children_left.index]
   children_left = children_left.sort_index()
+  thresholds.index = [int(val.split("_")[-1]) for val in thresholds.index]
+  thresholds = thresholds.sort_index()
+  features.index = [int(val.split("_")[-1]) for val in features.index]
+  features = features.sort_index()
 
   np.savetxt("left_true.csv",clf.tree_.children_left.astype(int), fmt='%i')
   np.savetxt("right_true.csv",clf.tree_.children_right.astype(int), fmt='%i')
+  np.savetxt("feature_true.csv",clf.tree_.feature.astype(int), fmt='%i')
+  np.savetxt("thresholds_true.csv",clf.tree_.threshold, fmt='%f')
   children_left.to_csv("try_left.csv")
   children_right.to_csv("try_right.csv")
+  thresholds.to_csv("try_thresholds.csv")
+  features.to_csv("try_features.csv")
+
 
   print "scores before training"
   print a.score(X_test,Y_test)
