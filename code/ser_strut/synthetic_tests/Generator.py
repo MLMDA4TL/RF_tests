@@ -13,12 +13,14 @@ class ClusterPoints:
 				 max_coordinate,
 				 min_projected_dim_var,
 				 max_projected_dim_var,
+				 class_label,
 				 ):
-		# set dimensionality, weight and boundary
+		# set dimensionality, weight, boundary and class label
 		self.dimensionality = dimensionality
 		self.weight = weight
 		self.min_coordinate = min_coordinate
 		self.max_coordinate = max_coordinate
+		self.class_label = class_label
 		# Draw initial centroids locations
 		self.centroid = self.generate_uniform_value(max_coordinate, min_coordinate)
 		# Draw clusters radii
@@ -51,6 +53,7 @@ class StreamGenerator:
 				 max_coordinate,
 				 min_projected_dim_var,
 				 max_projected_dim_var,
+				 class_labels = None,
 				 ):
 		self.number_points = number_points
 		self.dimensionality = dimensionality
@@ -62,6 +65,9 @@ class StreamGenerator:
 		self.max_projected_dim_var = max_projected_dim_var
 		self.weights = np.asarray(weights)
 		self.clusters = []
+		if class_labels is None: 
+			class_labels = range(len(self.weights))
+		self.class_labels = class_labels
 		for i,weight in enumerate(self.weights):
 			cluster  = ClusterPoints(weight,
 									 dimensionality,
@@ -71,6 +77,7 @@ class StreamGenerator:
 									 max_coordinate,
 									 min_projected_dim_var,
 									 max_projected_dim_var,
+									 class_labels[i],
 									 )
 			self.clusters.append(cluster)
 		self.compute_probabilities_draw_cluster()
@@ -81,7 +88,7 @@ class StreamGenerator:
 			self.compute_probabilities_draw_cluster()
 			cluster_id = np.random.choice(range(len(self.clusters)),1,p=self.probability_draw_cluster)[0]
 			new_point = self.clusters[cluster_id].generate_point()
-			yield np.hstack((new_point,cluster_id))
+			yield np.hstack((new_point,self.clusters[cluster_id].class_label))
 			
 
 	def compute_probabilities_draw_cluster(self):
