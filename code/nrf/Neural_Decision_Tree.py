@@ -29,12 +29,22 @@ LEAVES_FEATURES = -2
 
 class ndt:
   def __init__(self,D,gammas=[10,1,1],tree_id=None,sigma=0):
+    """
+    Creates and neural decision tree
+    :param gammas: Metaparameter for each layer of the neural decision tree (slope of the tanh function). High gamma -> behavior of NN is closer to tree (and also harder to change).
+    :param tree_id: identifier for the tree.
+    :param sigma: STD for the initial weights
+    """
     self.gammas = gammas
     self.D = D
     self.tree_id = tree_id
     self.sigma = sigma
 
   def compute_matrices_and_biases(self, decision_tree):
+    """
+    Compute synaptic weights and biases according to a decision tree 
+    :param decision_tree: scikit-learn decision tree
+    """
     self.decision_tree = decision_tree
     self.splits = pd.DataFrame(get_list_split_phi(decision_tree)).T
     self.leaves = get_parents_nodes_leaves_dic(decision_tree)
@@ -80,6 +90,9 @@ class ndt:
     self.specify_tree_id()
 
   def specify_tree_id(self):
+    """
+    Change the name of the columns/indexes of the weights and biases to  include the tree id
+    """
     def add_id_2_elements(list_values, id_to_add):
       append_id = lambda x:str(id_to_add)+"_"+str(x)
       return map(append_id,list_values)
@@ -108,6 +121,14 @@ class ndt:
                                    "beta_2":0.999,
                                    "epsilon":1e-8,
                                    "decay":1e-6}):
+    """
+    Creates a keras neural network
+    :param dropouts: Dropouts for each layer
+    :param loss: loss function
+    :param optimizer: keras optimizer
+    :param kernel_regularizer: regularization constrains for each layer
+    :param optimizer_params: dictionnary of parameters for the optimizer
+    """
     self.input_layer = Input(shape=(self.D,))
     self.drop_input_layer = Dropout(dropouts[0])(self.input_layer)
 
@@ -152,6 +173,14 @@ class ndt:
           min_delta=0,
           patience=10,
           ):
+    """
+    Fit the neural decision tree
+    :param X: Training set
+    :param y: training set labels
+    :param epochs: number of epochs
+    :param min_delta: stoping criteria delta 
+    :param patience: stoping criteria patience
+    """
     y = to_categorical(y)
     early_stopping = EarlyStopping(monitor='loss',
                      min_delta=min_delta,
@@ -169,6 +198,11 @@ class ndt:
   def get_activations(self,
               X,
               y = None):
+    """
+    Get the activation for each layer
+    :param X: data set
+    :param y: labels
+    """
     nodes_a = pd.DataFrame(self.model_nodes.predict(X),
                            columns = self.b_nodes.index)
     leaves_a = pd.DataFrame(self.model_leaves.predict(X),
@@ -178,6 +212,9 @@ class ndt:
     return nodes_a, leaves_a, output_a
 
   def get_weights_from_NN(self):
+    """
+    Get the weights from the keras NN, and load them into attributes of the neural decision tree
+    """
     w_2 = self.model.layers[2].get_weights()
                        
     self.W_in_nodes_nn = pd.DataFrame(w_2[0],
@@ -204,6 +241,9 @@ class ndt:
                                    columns=self.b_class.columns)
 
   def compute_weights_differences(self):
+    """
+    Computes the difference between the original tree weights and those after training
+    """
     self.get_weights_from_NN()
     self.diff_W_in_nodes = self.W_in_nodes - self.W_in_nodes_nn
     self.diff_b_nodes = self.b_nodes - self.b_nodes_nn
@@ -215,15 +255,28 @@ class ndt:
   def predict_class(self,
                     X,
                     y = None):
+    """
+    Predict class membership with the neural decision tree
+    :param X: dataset 
+    :param y: labels
+    """
     class_indexes = np.argmax(self.model.predict(X),axis=1)
     return self.classes[class_indexes]
 
   def score(self,
             X,
             y):
+    """
+    Compute prediction score
+    :param X: dataset
+    :param y: labels
+    """
     return accuracy_score(self.predict_class(X),y)
 
   def plot_differences(self):
+    """
+    Plot the difference between the original tree weights and those after training
+    """
     if "diff_W_in_nodes" not in dir(self):
       self.compute_weights_differences()
     fig=plt.figure(figsize=(3, 2))
@@ -255,6 +308,9 @@ class ndt:
     plt.show()
 
   def plot_W_nn_quantiles(self,quantiles = np.arange(0,99.999,0.001)):
+    """
+    Plot the weights and biases quantiles
+    """
     fig=plt.figure(figsize=(3, 2))
     columns = 3
     rows = 2
@@ -412,10 +468,17 @@ class ndt:
     return children_right, children_left, thresholds, features
 
   def assert_sample(self,X):
+    """
+    Print the decision path for the samples as well as the activation functions.
+    :param X: dataset
+    """
     print_decision_path(self.decision_tree,X)
     print(self.get_activations(X))
 
   def print_tree_weights(self):
+    """
+    Print tree weights
+    """
     print("W: Input -> Nodes")
     print(self.W_in_nodes)
     print("b: Input -> Nodes")
@@ -430,6 +493,9 @@ class ndt:
     print(self.b_class)
 
   def print_nn_weights(self):
+    """
+    Print NN weights
+    """
     print("W: Input -> Nodes")
     print(self.W_in_nodes_nn)
     print("b: Input -> Nodes")
@@ -444,6 +510,9 @@ class ndt:
     print(self.b_class_nn)
 
   def plot_old_new_network(self):
+    """
+    Plot new and old network side by side
+    """
     if "W_in_nodes" not in dir(self):
       self.get_weights_from_NN()
     fig=plt.figure(figsize=(6, 2))
