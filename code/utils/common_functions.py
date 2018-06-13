@@ -198,3 +198,25 @@ def find_parent(tree, i_node):
       p = list(dic['nodes']['right_child']).index(i_node)
       b = 1
   return p, b
+
+def print_decision_path(tree, X, sample_id = 0):
+  node_indicator = tree.decision_path(X)
+  leave_id = tree.apply(X)
+  node_index = node_indicator.indices[node_indicator.indptr[sample_id]:
+                                      node_indicator.indptr[sample_id + 1]]
+  print('Rules used to predict sample %s: ' % sample_id)
+  print node_index
+  for node_id in node_index:
+    if (X[sample_id, tree.tree_.feature[node_id]] <= tree.tree_.threshold[node_id]):
+      threshold_sign = "<="
+    else:
+        threshold_sign = ">"
+    print("decision id node %s : (X_test[%s, %s] (= %s) %s %s)"
+          % (node_id,
+             sample_id,
+             tree.tree_.feature[node_id],
+             X[sample_id, tree.tree_.feature[node_id]],
+             threshold_sign,
+             tree.tree_.threshold[node_id]))
+
+

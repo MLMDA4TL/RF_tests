@@ -4,12 +4,8 @@
 """
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.tree import DecisionTreeClassifier,export_graphviz
-from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
 import sys
-sys.path.append("../utils")
-from common_functions import find_parent,leaves_id,get_list_split_phi_forest,get_list_split_phi,get_parents_nodes_leaves_dic
 from collections import OrderedDict 
 from keras.models import Model
 from keras.layers import Input, Dense, Dropout
@@ -19,6 +15,9 @@ from sklearn.preprocessing import LabelEncoder
 from keras.utils import to_categorical
 from sklearn.metrics import accuracy_score
 from keras.regularizers import l1
+sys.path.append("../utils")
+from common_functions import find_parent,leaves_id,get_list_split_phi_forest,get_list_split_phi,get_parents_nodes_leaves_dic, print_decision_path
+
 BIAS = 1
 DIM = 0
 RIGHT = 1
@@ -26,6 +25,7 @@ LEFT = -1
 LEAVES = -1
 LEAVES_THRESHOLDS = -2
 LEAVES_FEATURES = -2
+
 
 class ndt:
   def __init__(self,D,gammas=[10,1,1],tree_id=None,sigma=0):
@@ -35,6 +35,7 @@ class ndt:
     self.sigma = sigma
 
   def compute_matrices_and_biases(self, decision_tree):
+    self.decision_tree = decision_tree
     self.splits = pd.DataFrame(get_list_split_phi(decision_tree)).T
     self.leaves = get_parents_nodes_leaves_dic(decision_tree)
     self.N = self.splits.shape[0]
@@ -111,13 +112,13 @@ class ndt:
     self.drop_input_layer = Dropout(dropouts[0])(self.input_layer)
 
     self.nodes_layer = Dense(self.N,
-                        activation="tanh",
-                        kernel_regularizer=kernel_regularizer[0])(self.drop_input_layer)
+                       activation="tanh",
+                       kernel_regularizer=kernel_regularizer[0])(self.drop_input_layer)
 
     self.drop_nodes_layer = Dropout(dropouts[1])(self.nodes_layer)
 
     self.leaves_layer = Dense(self.L,
-                        activation="tanh",
+                        activation="softmax",
                         kernel_regularizer=kernel_regularizer[1])(self.drop_nodes_layer)
     
     self.drop_nodes_layer = Dropout(dropouts[2])(self.leaves_layer)
@@ -410,8 +411,9 @@ class ndt:
     features[in_nodes_matrix.columns] = in_nodes_matrix.index[in_nodes_matrix.values.argmax(axis=0)]
     return children_right, children_left, thresholds, features
 
-
-
+  def assert_sample(self,X):
+    print_decision_path(self.decision_tree,X)
+    print(self.get_activations(X))
 
   def print_tree_weights(self):
     print("W: Input -> Nodes")
@@ -491,7 +493,7 @@ class ndt:
     plt.show()
 
 if __name__ == "__main__":
-  # Build a dataset
+  from sklearn.tree import DecisionTreeClassifier,export_graphviz
   import matplotlib.pyplot as plt
   dataset_length = 10000
   D = 2
