@@ -172,6 +172,7 @@ class ndt:
           epochs=100,
           min_delta=0,
           patience=10,
+          to_categorical_conversion=True,
           ):
     """
     Fit the neural decision tree
@@ -181,7 +182,8 @@ class ndt:
     :param min_delta: stoping criteria delta 
     :param patience: stoping criteria patience
     """
-    y = to_categorical(y)
+    if to_categorical_conversion:
+      y = to_categorical(y)
     early_stopping = EarlyStopping(monitor='loss',
                      min_delta=min_delta,
                      patience=patience,
