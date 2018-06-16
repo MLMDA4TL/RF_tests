@@ -25,7 +25,7 @@ LEFT = -1
 LEAVES = -1
 LEAVES_THRESHOLDS = -2
 LEAVES_FEATURES = -2
-
+EMPTY_NODE = -5
 
 class ndt:
   def __init__(self,D,gammas=[10,1,1],tree_id=None,sigma=0):
@@ -354,29 +354,29 @@ class ndt:
                     children_left,
                     node_leaves_matrix,
                     threshold):
-      """
+      
       print "_____________"
       print "parent",parent
       print "right_left",right_left
       print "nodes_leaves_sum"
       print node_leaves_matrix
-      """
+      
 
       # Find parent's child
       node_leaves_matrix = node_leaves_matrix[np.abs(node_leaves_matrix).sum(axis=1)>0]
       count_nb_leaves = np.abs(node_leaves_matrix).sum(axis=1)
       
       child = count_nb_leaves.argmax()
-      #print "child",child,count_nb_leaves[child]
+      print "child",child,count_nb_leaves[child]
 
       # Remaining nodes are those that have at least one leaf
       remaining_nodes = list(count_nb_leaves.index[count_nb_leaves>0])
-      """
+      
       print "nodes_leaves_sum"
       print np.abs(node_leaves_matrix).sum(axis=1)
       print "remaining nodes"
       print remaining_nodes
-      """
+      
       # Add child to tree
       if parent is not None:
         if right_left == RIGHT:
@@ -386,8 +386,8 @@ class ndt:
 
       # get leaves of current child
       current_node_leaves = node_leaves_matrix.loc[child]
-      #print "current node leaves"
-      #print current_node_leaves
+      print "current node leaves"
+      print current_node_leaves
       # Remove nodes that have been already included
       if parent in remaining_nodes:
         remaining_nodes.remove(parent)
@@ -399,16 +399,16 @@ class ndt:
       leaves = node_leaves_matrix.columns
       right_leaves = leaves[(current_node_leaves >= threshold).values]
       left_leaves = leaves[(current_node_leaves <= -threshold).values]
-      """
+      
       print "leaves", leaves
       print "right_leaves", right_leaves 
       print "left_leaves", left_leaves
-      """
+      
       # Apply the same method to right and left children 
       right_node_leaves_matrix = None
       if len(remaining_nodes):
         right_node_leaves_matrix = node_leaves_matrix[right_leaves]
-        if np.abs(right_node_leaves_matrix).sum().sum() == 0:
+        if np.abs(right_node_leaves_matrix).sum().sum() <= threshold:
           right_node_leaves_matrix = None
         else:
           insert_node(child,
@@ -418,15 +418,18 @@ class ndt:
                       right_node_leaves_matrix,
                       threshold)
       if right_node_leaves_matrix is None:
-        children_right[child] = right_leaves[0]
-        if len(right_leaves) > 1:
-          print "more than one leaf",right_leaves
-        #print "adding to", child, "children right",right_leaves 
-      left_node_leaves_matrix = None
+        if not len(right_leaves):
+          children_right[child] = EMPTY_NODE
+        else:
+          children_right[child] = right_leaves[0]
+          if len(right_leaves) > 1:
+            print "more than one leaf",right_leaves
+          print "adding to", child, "children right",right_leaves 
 
+      left_node_leaves_matrix = None
       if len(remaining_nodes):
         left_node_leaves_matrix = node_leaves_matrix[left_leaves]
-        if np.abs(left_node_leaves_matrix).sum().sum() == 0:
+        if np.abs(left_node_leaves_matrix).sum().sum() <= threshold:
           left_node_leaves_matrix = None
         else:
           insert_node(child,
@@ -437,10 +440,13 @@ class ndt:
                       threshold)
 
       if left_node_leaves_matrix is None:
-        children_left[child] = left_leaves[0]
-        if len(left_leaves) > 1:
-          print "more than one leaf",left_leaves
-        #print "adding to", child, "children left",left_leaves 
+        if not len(left_leaves):
+          children_left[child] = EMPTY_NODE
+        else:
+          children_left[child] = left_leaves[0]
+          if len(left_leaves) > 1:
+            print "more than one leaf",left_leaves
+        print "adding to", child, "children left",left_leaves 
 
     if node_leaves_matrix is None:
       node_leaves_matrix = self.W_nodes_leaves
@@ -453,13 +459,14 @@ class ndt:
     children_left = pd.Series(LEAVES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
     thresholds = pd.Series(LEAVES_THRESHOLDS,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
     features = pd.Series(LEAVES_FEATURES,index=list(node_leaves_matrix.index)+list(node_leaves_matrix.columns))
-
+    node_leaves_matrix_local = np.copy(node_leaves_matrix)
+    node_leaves_matrix_local = node_leaves_matrix_local * (np.abs(node_leaves_matrix)>=threshold*self.gammas[1])
     insert_node(None,
                 None,
                 children_right,
                 children_left,
-                node_leaves_matrix,
-                threshold*self.gammas[1])
+                node_leaves_matrix_local,
+                threshold)
     # Compute the threshold of each node
     #print features
     #print thresholds
@@ -563,6 +570,8 @@ class ndt:
     ax6b.set_title("b class nn")    
     plt.show()
 
+
+
 if __name__ == "__main__":
   from sklearn.tree import DecisionTreeClassifier,export_graphviz
   import matplotlib.pyplot as plt
@@ -580,12 +589,19 @@ if __name__ == "__main__":
   Y_test = np.ones(dataset_length)
   Y_test[0:dataset_length//2] *= 0
   # Train a Tree
-  clf = DecisionTreeClassifier(max_depth=20)
+  clf = DecisionTreeClassifier(max_depth=10)
   clf = clf.fit(X, Y)
 
-  a = ndt(D=2,gammas=[10,1,1],tree_id=0)
+  a = ndt(D=2,gammas=[1,5,1],tree_id=0)
   a.compute_matrices_and_biases(clf)
-  #a.to_keras(dropouts=[0.1,0.5,0.5])
+  a.to_keras(dropouts=[0.,0.,0.])
+  a.fit(X,Y)
+  a.get_weights_from_NN()
+  children_right, children_left, thresholds, features = a.neural_network_to_tree()
+
+  children_right, children_left, thresholds, features = a.neural_network_to_tree(a.W_nodes_leaves_nn,a.W_in_nodes_nn,a.b_nodes_nn,0.9)
+  #
+  """
   children_right, children_left, thresholds, features = a.neural_network_to_tree()
   children_right.index = [int(val.split("_")[-1]) for val in children_right.index]
   children_right = children_right.sort_index()
@@ -595,7 +611,7 @@ if __name__ == "__main__":
   thresholds = thresholds.sort_index()
   features.index = [int(val.split("_")[-1]) for val in features.index]
   features = features.sort_index()
-
+  
   np.savetxt("left_true.csv",clf.tree_.children_left.astype(int), fmt='%i')
   np.savetxt("right_true.csv",clf.tree_.children_right.astype(int), fmt='%i')
   np.savetxt("feature_true.csv",clf.tree_.feature.astype(int), fmt='%i')
@@ -604,7 +620,7 @@ if __name__ == "__main__":
   children_right.to_csv("try_right.csv")
   thresholds.to_csv("try_thresholds.csv")
   features.to_csv("try_features.csv")
-
+  """
 
   print "scores before training"
   print a.score(X_test,Y_test)
@@ -612,11 +628,11 @@ if __name__ == "__main__":
 
   print clf.score(X_test,Y_test)
   print clf.score(X,Y)
-  errors = a.fit(X,Y,epochs=100)
+  errors = a.fit(X,Y,epochs=10)
   print "scores after training"
   print a.score(X_test, Y_test)
   print a.score(X,Y)
-  a.get_weights_from_NN()
+  
   print "Tree weights"
   a.print_tree_weights()
   print "NN weights"
@@ -624,5 +640,35 @@ if __name__ == "__main__":
   #print "activations"
   #print a.get_activations(X)
   differences = a.compute_weights_differences()
+  a.plot_differences()
+  a.plot_old_new_network()
+  
+  import networkx as nx
+  from networkx.drawing.nx_agraph import write_dot
+  def plot_tree_like(children_left, children_right):
+    G = nx.DiGraph()
+    for node in children_right.index:
+      G.add_node(node)
+    for i,parent in enumerate(children_right.index):
+      child = children_right[parent]
+      if child == LEAVES or child == EMPTY_NODE:
+        child = str(child)+"_"+str(i)
+      G.add_edge(parent,child)
+    for i,parent in enumerate(children_left.index):
+      child = children_left[parent]
+      if child == LEAVES or child == EMPTY_NODE:
+        child = str(child)+"_"+str(i)
+      G.add_edge(parent,child)
+    return G
+  children_right, children_left, thresholds, features = a.neural_network_to_tree(a.W_nodes_leaves_nn,a.W_in_nodes_nn,a.b_nodes_nn,0.9)
+  G = plot_tree_like(children_left, children_right)
+  write_dot(G,"test.dot")
+
+  children_right, children_left, thresholds, features = a.neural_network_to_tree(threshold=0.1)
+  G = plot_tree_like(children_left, children_right)
+  write_dot(G,"test_prev.dot")
+
+
+
 
 
