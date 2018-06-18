@@ -20,14 +20,24 @@ from keras import optimizers
 from sklearn.preprocessing import LabelEncoder
 from keras.utils import to_categorical
 from sklearn.metrics import accuracy_score
-
+from keras.regularizers import l2,l1
 
 
 class nrf_fully_connected(ndt):
-  def __init__(self, D, gammas=[10,1,1,1]):
-    ndt.__init__(self, D, gammas)
+  def __init__(self, D, gammas=[10,1,1,1],random_forest_id=None,sigma=0):
+    """
+    Creates and neural random forest 
+    :param gammas: Metaparameter for each layer of the neural decision tree (slope of the tanh function). High gamma -> behavior of NN is closer to tree (and also harder to change).
+    :param random_forest_id: id for the neural random forest
+    :param sigma: STD for the initial weights
+    """
+    ndt.__init__(self, D, gammas,random_forest_id,sigma)
 
   def compute_matrices_and_biases(self, random_forest):
+    """
+    Computes the weights and biases of the NRF. 
+    One huge NN gathering all the trees is created.
+    """
     self.rf = random_forest
     self.classes = self.rf.classes_
     self.ndts = []
@@ -56,9 +66,20 @@ class nrf_fully_connected(ndt):
 
 class nrf_independent_ndt(ndt):
   def __init__(self, D, gammas=[10,1,1,1]):
+    """
+    Creates a NRF were each tree is independent of each other. 
+    The last decision is a weighted voting of each tree
+    :param D: dimensionality of the dataset
+    :param gammas: Metaparameter for each layer of the neural decision tree (slope of the tanh function). High gamma -> behavior of NN is closer to tree (and also harder to change).
+    """
     ndt.__init__(self, D, gammas)
 
-  def compute_weights_differences(self, random_forest):
+  def compute_matrices_and_biases(self, random_forest):
+    """
+    Computes the weights and biases of the NRF. 
+    Each DT from the RF is mapped to a NN, and a last layer is created for the weighted voting.
+    :param random_forest: Sklearn random forest
+    """
     self.rf = random_forest
     self.classes = self.rf.classes_
     self.ndts = []
@@ -73,7 +94,9 @@ class nrf_independent_ndt(ndt):
                                 index = self.classes,
                                 columns = ["CLASS_BIASES"])
   def to_keras(self):
-    # Compute keras models for other trees
+    """
+    Creates keras NN model
+    """
     for tree in self.ndts:
       tree.to_keras()
     # Define the averaging model
@@ -88,11 +111,17 @@ class nrf_independent_ndt(ndt):
   def get_activations(self,
                       X,
                       y=None):
+    """
+    Get activation of each layer of the NRF
+    """
     output_a = pd.DataFrame(self.model.predict(X),
                             columns=self.b_class.columns)
     return [t.get_activations(X,y) for t in self.ndts]+[[output_a]]
 
   def get_weights_from_NN(self):
+    """
+    Get the NRF weights from Keras object
+    """
     for tree in self.ndts:
       tree.get_weights_from_NN()
     w_9 = self.model.layers[9].get_weights()
@@ -104,12 +133,18 @@ class nrf_independent_ndt(ndt):
                                    columns = ["CLASS_BIASES"])
 
   def compute_weights_differences(self):
+    """
+    Compute the difference between the weights mapped from the original RF, and the NRF weights
+    """
     self.get_weights_from_NN()
     diff_W_outputs_to_output_nn = self.W_outputs_to_output - self.W_outputs_to_output_nn
     diff_b_class_nn = self.b_class_nn - self.b_class
     return [t.compute_weights_differences() for t in self.ndts] + [[diff_W_outputs_to_output_nn,diff_b_class_nn]]
 
   def print_tree_weights(self):
+    """
+    Print the weights mapped from the original RF
+    """
     for t in self.ndts:
       t.print_tree_weights()
     print("W: outputs -> output")
@@ -118,6 +153,9 @@ class nrf_independent_ndt(ndt):
     print(self.b_class)
 
   def print_nn_weights(self):
+    """
+    Print the NRF weights
+    """
     for t in self.ndts:
       t.print_nn_weights()
     print("W: outputs -> output")
@@ -126,6 +164,8 @@ class nrf_independent_ndt(ndt):
     print(self.b_class_nn)    
 
 if __name__ == "__main__":
+  np.random.seed(0)
+  from keras.regularizers import l2,l1
   import matplotlib.pyplot as plt
   dataset_length = 1000
   D = 2
@@ -144,24 +184,34 @@ if __name__ == "__main__":
   rf = RandomForestClassifier(max_depth=5,n_estimators=10)
   rf.fit(X, Y)
 
-  a = nrf_fully_connected(D=2,gammas=[10,1,1])
+  a = nrf_fully_connected(D=2,gammas=[10,1,1],sigma=0.)
   a.compute_matrices_and_biases(rf)
-  a.to_keras()
+  l1_coef = -4
+  a.to_keras(kernel_regularizer=[l1(10**l1_coef),l1(10**l1_coef),l1(10**l1_coef)],
+             dropouts = [0.1,0.1,0.1])
   print "scores before training"
   print a.score(X_test,Y_test)
   print a.score(X,Y)
-  errors = a.fit(X,Y)
+  errors = a.fit(X,Y,epochs=100)
+  plt.plot(errors)
+  plt.show()
   print "scores after training"
   print a.score(X_test, Y_test)
   print a.score(X,Y)
+  print "scores forest"
+  print a.rf.score(X_test, Y_test)
+  print a.rf.score(X,Y)
   a.get_weights_from_NN()
-  print "Tree weights"
-  a.print_tree_weights()
-  print "NN weights"
-  a.print_nn_weights()
-  print "activations"
-  print a.get_activations(X)
+
+  #print "Tree weights"
+  #a.print_tree_weights()
+  #print "NN weights"
+  #a.print_nn_weights()
+  #print "activations"
+  #print a.get_activations(X)
   differences = a.compute_weights_differences()
-  for diff in differences:
-    plt.imshow(diff)
-    plt.show()
+  a.plot_old_new_network()
+  a.plot_differences()
+  a.plot_W_nn_quantiles()
+
+
