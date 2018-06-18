@@ -29,14 +29,16 @@ from sklearn.tree import export_graphviz
 #
 #==============================================================================
 
-def updateValues(tree,values):
+
+def updateValues(tree, values):
     d = tree.__getstate__()
     d['values'] = values
     d['nodes']['n_node_samples'] = np.sum(values, axis=-1).reshape(-1)
     d['nodes']['weighted_n_node_samples'] = np.sum(values, axis=-1).reshape(-1)
     tree.__setstate__(d)
-   
-def depth(tree,f):
+
+
+def depth(tree, f):
     if f == -1:
         return 0
     if f == 0:
@@ -51,28 +53,31 @@ def depth_array(tree, inds):
         depths[i] = depth(tree, i)
     return depths
 
+
 def max_depth_dTree(dTree):
     t = dTree.tree_
     n = t.node_count
-    
-    return np.amax(depth_array(t,np.linspace(0,n-1,n).astype(int)))
+
+    return np.amax(depth_array(t, np.linspace(0, n - 1, n).astype(int)))
 
 
 def max_depth_rf(rf):
     p = 0
     for e in rf.estimators_:
-        if max_depth_dTree(e) > p :
+        if max_depth_dTree(e) > p:
             p = max_depth_dTree(e)
     return p
-    
-def leaf_error(tree,node):
-    if np.sum(tree.value[node]) == 0 :
+
+
+def leaf_error(tree, node):
+    if np.sum(tree.value[node]) == 0:
         return 0
     else:
         return 1 - np.max(tree.value[node]) / np.sum(tree.value[node])
 
-def error(tree,node):
-    if node == -1 : 
+
+def error(tree, node):
+    if node == -1:
         return 0
     else:
 
@@ -92,6 +97,7 @@ def error(tree,node):
 
                 return (el * nl + er * nr) / (nl + nr)
 
+
 def find_parent(dic, i_node):
     p = -1
     b = 0
@@ -109,6 +115,7 @@ def find_parent(dic, i_node):
             p = p
 
     return p, b
+
 
 def sub_nodes(tree, node):
     if (node == -1):
@@ -136,26 +143,31 @@ def fusionTree(tree1, f, tree2):
     dic['nodes'][f] = dic2['nodes'][0]
 
     if (dic2['nodes']['left_child'][0] != - 1):
-        dic['nodes']['left_child'][f] = dic2['nodes']['left_child'][0] + size_init - 1
+        dic['nodes']['left_child'][f] = dic2[
+            'nodes']['left_child'][0] + size_init - 1
     else:
         dic['nodes']['left_child'][f] = -1
     if (dic2['nodes']['right_child'][0] != - 1):
-        dic['nodes']['right_child'][f] = dic2['nodes']['right_child'][0] + size_init - 1
+        dic['nodes']['right_child'][f] = dic2[
+            'nodes']['right_child'][0] + size_init - 1
     else:
         dic['nodes']['right_child'][f] = -1
 
     # Attention vecteur impurity pas mis à jour
-    
-    dic['nodes'] = np.concatenate((dic['nodes'] , dic2['nodes'][1:]  ))
-    dic['nodes']['left_child'][size_init:] = (dic['nodes']['left_child'][size_init:] != -1 )*(dic['nodes']['left_child'][size_init:] + size_init ) -1
-    dic['nodes']['right_child'][size_init:] = (dic['nodes']['right_child'][size_init:] != -1 )*(dic['nodes']['right_child'][size_init:] + size_init ) - 1
 
-    values = np.concatenate((dic['values'],np.zeros((dic2['values'].shape[0]-1,dic['values'].shape[1],dic['values'].shape[2]))  ),axis = 0)
+    dic['nodes'] = np.concatenate((dic['nodes'], dic2['nodes'][1:]))
+    dic['nodes']['left_child'][size_init:] = (dic['nodes']['left_child'][
+                                              size_init:] != -1) * (dic['nodes']['left_child'][size_init:] + size_init) - 1
+    dic['nodes']['right_child'][size_init:] = (dic['nodes']['right_child'][
+                                               size_init:] != -1) * (dic['nodes']['right_child'][size_init:] + size_init) - 1
+
+    values = np.concatenate((dic['values'], np.zeros((dic2['values'].shape[
+                            0] - 1, dic['values'].shape[1], dic['values'].shape[2]))), axis=0)
 
     dic['values'] = values
-    
-    #Attention :: (potentiellement important) 
-    (Tree,(n_f,n_c,n_o),b) = tree1.__reduce__()
+
+    # Attention :: (potentiellement important)
+    (Tree, (n_f, n_c, n_o), b) = tree1.__reduce__()
     #del tree1
     #del tree2
 
@@ -163,7 +175,8 @@ def fusionTree(tree1, f, tree2):
 
     tree1.__setstate__(dic)
     return tree1
-    
+
+
 def fusionDecisionTree(dTree1, f, dTree2):
     """adding tree dTree2 to leaf f of tree dTree1"""
     #dTree = sklearn.tree.DecisionTreeClassifier()
@@ -171,9 +184,11 @@ def fusionDecisionTree(dTree1, f, dTree2):
     dTree1.tree_ = fusionTree(dTree1.tree_, f, dTree2.tree_)
 
     try:
-        dTree1.tree_.value[size_init:, :, dTree2.classes_.astype(int)] = dTree2.tree_.value[1:, :, :]
+        dTree1.tree_.value[size_init:, :, dTree2.classes_.astype(
+            int)] = dTree2.tree_.value[1:, :, :]
     except IndexError as e:
-        print("IndexError : size init : ", size_init, "\ndTree2.classes_ : ", dTree2.classes_)
+        print("IndexError : size init : ", size_init,
+              "\ndTree2.classes_ : ", dTree2.classes_)
         print(e)
     dTree1.max_depth = dTree1.tree_.max_depth
     return dTree1
@@ -212,14 +227,15 @@ def cut_from_left_right(dTree, node, bool_left_right):
 
     if bool_left_right == 1:
         repl_node = dTree.tree_.children_left[node]
-        #node_to_rem = [node] + sub_nodes(dTree.tree_,dTree.tree_.children_right[node]) 
-        node_to_rem = [node,dTree.tree_.children_right[node]]
+        #node_to_rem = [node] + sub_nodes(dTree.tree_,dTree.tree_.children_right[node])
+        node_to_rem = [node, dTree.tree_.children_right[node]]
     elif bool_left_right == -1:
         repl_node = dTree.tree_.children_right[node]
         #node_to_rem = [node] + sub_nodes(dTree.tree_,dTree.tree_.children_left[node])
-        node_to_rem = [node,dTree.tree_.children_left[node]]
-        
-    inds = list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem))
+        node_to_rem = [node, dTree.tree_.children_left[node]]
+
+    inds = list(
+        set(np.linspace(0, size_init - 1, size_init).astype(int)) - set(node_to_rem))
 
     dic['capacity'] = dTree.tree_.capacity - len(node_to_rem)
     dic['node_count'] = dTree.tree_.node_count - len(node_to_rem)
@@ -253,10 +269,12 @@ def cut_from_left_right(dTree, node, bool_left_right):
 
     dTree.tree_ = Tree(n_f, n_c, n_o)
     dTree.tree_.__setstate__(dic)
-    depths = depth_array(dTree.tree_,np.linspace(0,dTree.tree_.node_count-1,dTree.tree_.node_count).astype(int))
+    depths = depth_array(dTree.tree_, np.linspace(
+        0, dTree.tree_.node_count - 1, dTree.tree_.node_count).astype(int))
     dTree.tree_.max_depth = np.max(depths)
 
     return inds.index(repl_node)
+
 
 def cut_into_leaf2(dTree, node):
     dic = dTree.tree_.__getstate__().copy()
@@ -266,9 +284,10 @@ def cut_into_leaf2(dTree, node):
 
     node_to_rem = node_to_rem + sub_nodes(dTree.tree_, node)[1:]
     node_to_rem = list(set(node_to_rem))
-    
-    inds = list(set(np.linspace(0,size_init-1,size_init).astype(int))-set(node_to_rem))
-    depths = depth_array(dTree.tree_,inds)
+
+    inds = list(
+        set(np.linspace(0, size_init - 1, size_init).astype(int)) - set(node_to_rem))
+    depths = depth_array(dTree.tree_, inds)
     dic['max_depth'] = np.max(depths)
 
     dic['capacity'] = dTree.tree_.capacity - len(node_to_rem)
@@ -304,49 +323,50 @@ def cut_into_leaf2(dTree, node):
     dTree.tree_.__setstate__(dic)
 
     return inds.index(node)
-    
-def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl = False, cl_no_red = None, no_ser_on_cl=False, cl_no_ser=None):
-    
-    #Maj values
+
+
+def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None):
+
+    # Maj values
     #old_val = dTree.tree_.value[node]
-    val = np.zeros((dTree.n_outputs_,dTree.n_classes_))
+    val = np.zeros((dTree.n_outputs_, dTree.n_classes_))
 
     for i in range(dTree.n_classes_):
-        val[:,i] = list(y_target_node).count(i)
-        
-    old_size_cl_no_red = np.sum(dTree.tree_.value[node][:,cl_no_red])
-    
-    if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0  and old_size_cl_no_red > 0: 
-        v = np.zeros((dTree.n_outputs_,dTree.n_classes_))
-        val[:,cl_no_red] = dTree.tree_.value[node][:,cl_no_red]
-        
-        v[:,cl_no_red] = val[:,cl_no_red]
-        add_to_parents(dTree,node,v)
-        
-    dTree.tree_.value[node] =  val
-    dTree.tree_.n_node_samples[node] =  np.sum(val)
-    dTree.tree_.weighted_n_node_samples[node] =  np.sum(val)
-        
+        val[:, i] = list(y_target_node).count(i)
+
+    old_size_cl_no_red = np.sum(dTree.tree_.value[node][:, cl_no_red])
+
+    if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0 and old_size_cl_no_red > 0:
+        v = np.zeros((dTree.n_outputs_, dTree.n_classes_))
+        val[:, cl_no_red] = dTree.tree_.value[node][:, cl_no_red]
+
+        v[:, cl_no_red] = val[:, cl_no_red]
+        add_to_parents(dTree, node, v)
+
+    dTree.tree_.value[node] = val
+    dTree.tree_.n_node_samples[node] = np.sum(val)
+    dTree.tree_.weighted_n_node_samples[node] = np.sum(val)
+
     ### EXPANSION ###
 
     # Si c'est une feuille
     if dTree.tree_.feature[node] == -2:
         if no_ser_on_cl:
-            if np.sum(dTree.tree_.value[node,:]) >0 and np.argmax(dTree.tree_.value[node,:]) not in cl_no_ser :
+            if np.sum(dTree.tree_.value[node, :]) > 0 and np.argmax(dTree.tree_.value[node, :]) not in cl_no_ser:
                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
                 # to make a complete tree
                 try:
                     DT_to_add.min_impurity_decrease = 0
                 except:
                     DT_to_add.min_impurity_split = 0
-                DT_to_add.fit( X_target_node, y_target_node)
+                DT_to_add.fit(X_target_node, y_target_node)
                 fusionDecisionTree(dTree, node, DT_to_add)
             else:
                 print('Feuille laissée intacte')
 #
         else:
-            #Si elle n'est pas déjà pure
-            if ( len(set(list(y_target_node))) > 1 ) :
+            # Si elle n'est pas déjà pure
+            if (len(set(list(y_target_node))) > 1):
                 # build full new tree from f
                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
                 # to make a complete tree
@@ -354,17 +374,18 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl = False, cl_no_r
                     DT_to_add.min_impurity_decrease = 0
                 except:
                     DT_to_add.min_impurity_split = 0
-                DT_to_add.fit( X_target_node, y_target_node)
+                DT_to_add.fit(X_target_node, y_target_node)
                 fusionDecisionTree(dTree, node, DT_to_add)
 
-                 
         return node
-    
-    #Si ce n'est pas une feuille
 
-    bool_test = X_target_node[:,dTree.tree_.feature[node]] <= dTree.tree_.threshold[node]
-    not_bool_test = X_target_node[:,dTree.tree_.feature[node]] > dTree.tree_.threshold[node]
-    
+    # Si ce n'est pas une feuille
+
+    bool_test = X_target_node[:, dTree.tree_.feature[
+        node]] <= dTree.tree_.threshold[node]
+    not_bool_test = X_target_node[
+        :, dTree.tree_.feature[node]] > dTree.tree_.threshold[node]
+
     ind_left = np.where(bool_test)[0]
     ind_right = np.where(not_bool_test)[0]
 
@@ -375,14 +396,14 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl = False, cl_no_r
     y_target_node_right = y_target_node[ind_right]
 
     #<----- CHGT STRUCTURE :"node" DOIT CHANGER ( OK REC )
-    new_node_left = SER(dTree.tree_.children_left[node],dTree,X_target_node_left,y_target_node_left,
-            no_red_on_cl = no_red_on_cl, cl_no_red = cl_no_red,
-            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser) 
+    new_node_left = SER(dTree.tree_.children_left[node], dTree, X_target_node_left, y_target_node_left,
+                        no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
+                        no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
     dic = dTree.tree_.__getstate__().copy()
-    node,b = find_parent(dic,new_node_left)
-    new_node_right = SER(dTree.tree_.children_right[node],dTree,X_target_node_right,y_target_node_right,
-            no_red_on_cl = no_red_on_cl, cl_no_red = cl_no_red,
-            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser) 
+    node, b = find_parent(dic, new_node_left)
+    new_node_right = SER(dTree.tree_.children_right[node], dTree, X_target_node_right, y_target_node_right,
+                         no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
+                         no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
     dic = dTree.tree_.__getstate__().copy()
     node, b = find_parent(dic, new_node_right)
 
@@ -398,37 +419,39 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl = False, cl_no_r
         node = new_node_leaf
 
     if dTree.tree_.feature[node] != -2:
-        #Normalement, on passe sur un noeud atteint ( donc les 2 pas zero simult.)
+        # Normalement, on passe sur un noeud atteint ( donc les 2 pas zero
+        # simult.)
         if no_red_on_cl:
             if ind_left.size and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
                 node = cut_from_left_right(dTree, node, -1)
-        
-            if ind_right.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_right[node]]) == 0 :
+
+            if ind_right.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_right[node]]) == 0:
                 node = cut_from_left_right(dTree, node, 1)
         else:
             if ind_left.size == 0:
                 node = cut_from_left_right(dTree, node, -1)
-        
+
             if ind_right.size == 0:
                 node = cut_from_left_right(dTree, node, 1)
 
     #export_graphviz(dTree, "output/dtree_after_red_test.dot")
-    
-    
-    #On en a besoin pour mettre à jour les vecteurs n_node_samples & weighted_n_node_samples à partir des values
-    #Peut être à revoir plus tard
+
+    # On en a besoin pour mettre à jour les vecteurs n_node_samples & weighted_n_node_samples à partir des values
+    # Peut être à revoir plus tard
 #    if node == 0:
 #        updateValues(dTree.tree_, dTree.tree_.value)
-        
+
     return node
+
 
 def add_to_parents(dTree, node, values):
     dic = dTree.tree_.__getstate__().copy()
-    p,b = find_parent(dic,node)
-    if b != 0: 
+    p, b = find_parent(dic, node)
+    if b != 0:
         dTree.tree_.value[p] = dTree.tree_.value[p] + values
         add_to_parents(dTree, p, values)
-        
+
+
 def add_to_child(dTree, node, values):
 
     l = dTree.tree_.children_left[node]
@@ -436,24 +459,26 @@ def add_to_child(dTree, node, values):
 
     if r != -1:
         dTree.tree_.value[r] = dTree.tree_.value[r] + values
-        add_to_child(dTree, r, values)       
+        add_to_child(dTree, r, values)
     if l != -1:
         dTree.tree_.value[l] = dTree.tree_.value[l] + values
-        add_to_child(dTree, l, values)        
-        
-def  bootstrap(size):
-    return np.random.choice( np.linspace(0,size-1,size).astype(int), size, replace = True )
+        add_to_child(dTree, l, values)
 
-def SER_RF(random_forest, X_target, y_target, bootstrap_ = False, no_red_on_cl = False, cl_no_red = None, no_ser_on_cl=False, cl_no_ser=None):
+
+def bootstrap(size):
+    return np.random.choice(np.linspace(0, size - 1, size).astype(int), size, replace=True)
+
+
+def SER_RF(random_forest, X_target, y_target, bootstrap_=False, no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None):
     rf_ser = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_ser.estimators_):
         print("tree n° ", i)
-        
-        inds = np.linspace(0,y_target.size-1,y_target.size).astype(int)
+
+        inds = np.linspace(0, y_target.size - 1, y_target.size).astype(int)
         if bootstrap_:
             inds = bootstrap(y_target.size)
-            
-        SER(0,rf_ser.estimators_[i], X_target[inds], y_target[inds],
-                no_red_on_cl = no_red_on_cl, cl_no_red = cl_no_red,
-                no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
+
+        SER(0, rf_ser.estimators_[i], X_target[inds], y_target[inds],
+            no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
+            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
     return rf_ser
