@@ -79,10 +79,11 @@ path_data = 'outputs/final/'
 path_results = 'outputs/final/results/'
 name_results = 'results.csv'
 
-N_EXP = 13
-N_DS = 1
+N_EXP_START = 13
+N_EXP = 18
+N_DS = 5
 
-N_REP = 1
+N_REP = 5
 
 
 
@@ -103,7 +104,7 @@ results = pd.DataFrame(columns=["Exp","Dataset","Rep","Alg","TPR","FPR","F-score
 # =============================================================================
 
 
-for e in range(N_EXP):
+for e in range(N_EXP_START, N_EXP):
     print("\n\n\n\n EXP n ° "+str(e)+"\n\n\n\n")
     for k in range(N_DS):
         
@@ -242,15 +243,15 @@ for e in range(N_EXP):
                 av_score_ser_no_red[i] = sklearn.metrics.average_precision_score(Y_target_test, rf_ser_no_red.predict_proba(X_target_test)[:,1])
                 av_score_strut[i] = sklearn.metrics.average_precision_score(Y_target_test, rf_strut.predict_proba(X_target_test)[:,1])    
             
-                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Source","TPR":tpr_rf[i],"FPR":tpr_rf[i],"F-score":fscore[i],"ROC AUC":auc_score[i],"av prec":av_score[i]})
+                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Source","TPR":tpr_rf[i],"FPR":fpr_rf[i],"F-score":fscore[i],"ROC AUC":auc_score[i],"av prec":av_score[i]})
                 results = results.append(l,ignore_index=True)
-                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"TargetOnly","TPR":tpr_targ[i],"FPR":tpr_targ[i],"F-score":fscore_targ[i],"ROC AUC":auc_score_targ[i],"av prec":av_score_targ[i]})
+                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"TargetOnly","TPR":tpr_targ[i],"FPR":fpr_targ[i],"F-score":fscore_targ[i],"ROC AUC":auc_score_targ[i],"av prec":av_score_targ[i]})
                 results = results.append(l,ignore_index=True)
-                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Ser","TPR":tpr_ser[i],"FPR":tpr_ser[i],"F-score":fscore_ser[i],"ROC AUC":auc_score_ser[i],"av prec":av_score_ser[i]})
+                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Ser","TPR":tpr_ser[i],"FPR":fpr_ser[i],"F-score":fscore_ser[i],"ROC AUC":auc_score_ser[i],"av prec":av_score_ser[i]})
                 results = results.append(l,ignore_index=True)
-                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"SerNoRed1","TPR":tpr_ser_no_red[i],"FPR":tpr_ser_no_red[i],"F-score":fscore_ser_no_red[i],"ROC AUC":auc_score_ser_no_red[i],"av prec":av_score_ser_no_red[i]})
+                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"SerNoRed1","TPR":tpr_ser_no_red[i],"FPR":fpr_ser_no_red[i],"F-score":fscore_ser_no_red[i],"ROC AUC":auc_score_ser_no_red[i],"av prec":av_score_ser_no_red[i]})
                 results = results.append(l,ignore_index=True)
-                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Strut","TPR":tpr_strut[i],"FPR":tpr_strut[i],"F-score":fscore_strut[i],"ROC AUC":auc_score_strut[i],"av prec":av_score_strut[i]})
+                l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Strut","TPR":tpr_strut[i],"FPR":fpr_strut[i],"F-score":fscore_strut[i],"ROC AUC":auc_score_strut[i],"av prec":av_score_strut[i]})
                 results = results.append(l,ignore_index=True)
             #    l = pd.Series({"Exp":e,"Dataset":k,"Rep":i,"Alg":"Strut_no_red1","TPR":tpr_rf[i],"FPR":tpr_rf[i],"F-score":fscore[i],"ROC AUC":auc_score[i],"av prec":av_score[i]})
             #    results = results.append(l,ignore_index=True)
