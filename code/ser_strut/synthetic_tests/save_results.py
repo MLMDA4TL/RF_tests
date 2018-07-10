@@ -72,18 +72,18 @@ def predict_proba_without_weight(rf,X):
         S[:,i] = np.sum(1*filt/rf.n_estimators,axis=1)
     
     return S
+
 # =============================================================================
 # 
 # =============================================================================
-path_data = 'outputs/final/'
-path_results = 'outputs/final/results/'
+path_data = 'outputs/'
+path_results = 'outputs/results/'
 name_results = 'results.csv'
 
-N_EXP_START = 13
+N_EXP_START = 0
 N_EXP = 18
-N_DS = 5
-
-N_REP = 5
+N_DS = 10
+N_REP = 10
 
 
 
@@ -178,8 +178,8 @@ for e in range(N_EXP_START, N_EXP):
                 
                 y_targ_p = rf_target.predict_proba(X_target_test) 
                 y_ser_p = rf_ser.predict_proba(X_target_test) 
-                #y_ser_no_red_p = rf_ser_no_red.predict_proba(X_target_test) 
-                y_ser_no_red_p = predict_proba_without_weight(rf_ser_no_red,X_target_test)
+                y_ser_no_red_p = rf_ser_no_red.predict_proba(X_target_test) 
+                #y_ser_no_red_p = predict_proba_without_weight(rf_ser_no_red,X_target_test)
                 y_strut_p = rf_strut.predict_proba(X_target_test)
                 
                 f,p,t = sklearn.metrics.roc_curve(Y_target_test, y_targ_p[:,1])

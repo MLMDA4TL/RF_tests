@@ -92,10 +92,11 @@ def random_var_cl(sg,var,nb):
 #             
 # =============================================================================
 
-N_EXP = 19
+N_EXP = 18
 N_REP = 10
 
-path_out = './outputs/final/'
+name_param = 'ref'
+path_out = './outputs/'+name_param
 
 
 for i in range(N_REP):
@@ -112,7 +113,7 @@ for i in range(N_REP):
     
     n_source = 500
     
-    var = "-"
+    var = "+10"
     sg = StreamGenerator(number_points=n_source,
     					 weights=[prop1,prop1,prop1,prop1,prop1,prop1,prop1,prop1,prop0,prop0, prop0,prop0,prop0,prop0, prop0,prop0],
     					 dimensionality=dim,
@@ -124,7 +125,7 @@ for i in range(N_REP):
     					 max_projected_dim_var=5,
     					 class_labels=[1,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0],
     					 )
-    pickle.dump(sg,open(path_out+"source_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+"std"+str(var)+"_Rep"+str(i)+".pkl","wb"))
+    pickle.dump(sg,open(path_out+"source_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".pkl","wb"))
     
     #Mise en forme du source
     
@@ -132,7 +133,7 @@ for i in range(N_REP):
     X_source = a[1].values[:,:-1]
     Y_source = a[1].values[:,-1]
     
-    a[1].to_csv(path_out+"DataTrain_source_"+sg.get_file_name()+"Exp"+str(N_EXP)+"std"+str(var)+"_Rep"+str(i)+".csv")
+    a[1].to_csv(path_out+"DataTrain_source_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
 
 #    if unit_test:
 #        sns.pairplot(a[1],hue="cluster")
@@ -166,7 +167,7 @@ for i in range(N_REP):
 
 
     random_drift_cl(sg,1,N1+N0)
-    #random_var_cl(sg,5,N1+N0)
+    random_var_cl(sg,1,N1+N0)
 
     
     
@@ -176,13 +177,13 @@ for i in range(N_REP):
 
     print('N clust target:',len(sg.clusters))
     
-    pickle.dump(sg,open(path_out+"target_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+"std"+str(var)+"_Rep"+str(i)+".pkl","wb"))
+    pickle.dump(sg,open(path_out+"target_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".pkl","wb"))
     
     c = sg.get_full_dataset(1000)
     X_target_test = c[1].values[:,:-1]
     Y_target_test = c[1].values[:,-1]
     
-    c[1].to_csv(path_out+"DataTest_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+"std"+str(var)+"_Rep"+str(i)+".csv")
+    c[1].to_csv(path_out+"DataTest_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
 
     
 #    if unit_test:
@@ -192,7 +193,7 @@ for i in range(N_REP):
      
     b = sg.get_full_dataset(200)
     
-    b[1].to_csv(path_out+"DataTrain_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+"std"+str(var)+"_Rep"+str(i)+".csv")
+    b[1].to_csv(path_out+"DataTrain_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
 
     X_target_train = b[1].values[:,:-1]
     Y_target_train = b[1].values[:,-1]
