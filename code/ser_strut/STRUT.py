@@ -189,12 +189,12 @@ def STRUT(decisiontree,
           pruning_updated_node=True,
           no_prune_on_cl=False,
           cl_no_prune=None):
-    # print("NODE ", node_index)
     tree = decisiontree.tree_
     phi = tree.feature[node_index]
     classes = decisiontree.classes_
     threshold = tree.threshold[node_index]
     old_threshold = threshold
+    current_class_distribution_source = np.round(tree.value[node_index])
     current_class_distribution = compute_class_distribution(
         classes, Y_target_node)
     current_class_distribution_noupdate = compute_class_distribution(
@@ -206,75 +206,86 @@ def STRUT(decisiontree,
     # print("value of source at node_index : ", tree.value[node_index, :,
                                                          # :].astype(int))
     tree.weighted_n_node_samples[node_index] = Y_target_node.size
-    tree.value[node_index] = current_class_distribution
+    # tree.value[node_index] = current_class_distribution
     tree.impurity[node_index] = GINI(current_class_distribution)
     tree.n_node_samples[node_index] = Y_target_node.size
+    # print("NODE ", node_index)
+    # print("feat ", phi)
+    # print("threshold ", threshold)
+    # print("Y_target_node ", Y_target_node)
+    # print("maj class before update values", np.argmax(tree.value[node_index]))
+    # print("classes ", classes)
+    # if node_index == 36:
+        # print("X_target at feat: ", X_target_node[:, phi])
+    # print("current_class_distribution_source ", current_class_distribution_source)
+    # print("current_class_distribution ", current_class_distribution)
+    # print("current_class_distribution_noupdate ",
+            # current_class_distribution_noupdate)
 
     # If it is a leaf one, exit
     if tree.children_left[node_index] == -1 and tree.children_right[node_index] == -1:
-        return 0
-
-    if pruning_updated_node:
-        is_reached = (current_class_distribution.sum() != 0)
-    else:
-        # print("current_class_distribution_noupdate : ",
-              # current_class_distribution_noupdate)
-        is_reached = (current_class_distribution_noupdate.sum() != 0)
-
-    # Unreachable node
-    if not is_reached:
-        print("!! node {} not reached by target".format(node_index))
-        # nb instances of class cl_no_prune
-        is_instance_cl_no_prune = np.sum(
-            tree.value[node_index, :, cl_no_prune])
-        # print("value at node_index : ", tree.value[node_index, :, :])
-        # print("instances not to prune ? :", is_instance_cl_no_prune)
+        # print("it's a leaf")
         # update tree.value
         tree.value[node_index] = current_class_distribution
-        if no_prune_on_cl and is_instance_cl_no_prune:
-            print("NO PRUNING at node ", node_index)
-        else:
-            print("PRUNING at node ", node_index)
-            prune_subtree(decisiontree,
-                          node_index)
-            parent_node, b_p = find_parent(tree, node_index)
-            # Get the brother index
-            if b_p == -1:  # current_node is left_children
-                brother_node = tree.children_right[parent_node]
-            if b_p == 1:  # current_node is right_children
-                brother_node = tree.children_left[parent_node]
-            # Get grand parent index
-            grand_parent_node, b_gp = find_parent(tree, parent_node)
-            # Shunt the parent
-            if b_gp == -1:  # parent is left_children of grandparent
-                tree.children_left[grand_parent_node] = brother_node
-
-            if b_gp == 1:  # parent is right_children of grandparent
-                tree.children_right[grand_parent_node] = brother_node
-            # supress the current node
-            tree.children_left[node_index] = -1
-            tree.children_right[node_index] = -1
-            tree.children_left[parent_node] = -1
-            tree.children_right[parent_node] = -1
         return 0
-    # update tree.value
-    tree.value[node_index] = current_class_distribution
+
+    is_reached_update = (current_class_distribution.sum() != 0)
+    is_reached_noupdate = (current_class_distribution_noupdate.sum() != 0)
+
+    is_instance_cl_no_prune = np.sum(tree.value[node_index, :, cl_no_prune])
+    # print("is_reached_update : ", is_reached_update)
+    # print("is_reached_noupdate : ", is_reached_noupdate)
+
+    prune_cond = not is_reached_update or (pruning_updated_node and (not is_reached_noupdate) and ((not no_prune_on_cl) or (not is_instance_cl_no_prune)))
+    # if no target data at all or ((not reached) and (pruning activated or no
+    # instance to preserve)), then prune
+    if prune_cond:
+        # print("PRUNING at node ", node_index)
+        prune_subtree(decisiontree,
+                      node_index)
+        parent_node, b_p = find_parent(tree, node_index)
+        # Get the brother index
+        if b_p == -1:  # current_node is left_children
+            brother_node = tree.children_right[parent_node]
+        if b_p == 1:  # current_node is right_children
+            brother_node = tree.children_left[parent_node]
+        # Get grand parent index
+        grand_parent_node, b_gp = find_parent(tree, parent_node)
+        # Shunt the parent
+        if b_gp == -1:  # parent is left_children of grandparent
+            tree.children_left[grand_parent_node] = brother_node
+
+        if b_gp == 1:  # parent is right_children of grandparent
+            tree.children_right[grand_parent_node] = brother_node
+        # supress the current node
+        tree.children_left[node_index] = -1
+        tree.children_right[node_index] = -1
+        tree.children_left[parent_node] = -1
+        tree.children_right[parent_node] = -1
+        return 0
+
+    else:
+        print("NO PRUNING at node ", node_index)
 
     # Only one class is present in the node -> terminal leaf
     if (current_class_distribution > 0).sum() == 1:
         # if clean_unreachable_subtrees:
-        print("Only one class in node {} --> PRUNING".format(node_index))
+        # print("Only one class in node {} --> PRUNING".format(node_index))
         prune_subtree(decisiontree,
                       node_index)
         tree.feature[node_index] = -2
         return 0
 
+    # update tree.value
+    tree.value[node_index] = current_class_distribution
     # update threshold
     if type(threshold) is np.float64:
         Q_source_l, Q_source_r = get_children_distributions(decisiontree,
                                                             node_index)
         Q_source_parent = get_node_distribution(decisiontree,
                                                 node_index)
+        # print("threshold selection : X_target_node shape : ",
+                # X_target_node.shape)
         t1 = threshold_selection(Q_source_parent,
                                  Q_source_l,
                                  Q_source_r,
@@ -321,11 +332,12 @@ def STRUT(decisiontree,
         index_X_child_l = X_target_node_noupdate[:, phi] <= old_threshold
         X_target_node_noupdate_l = X_target_node_noupdate[index_X_child_l, :]
         Y_target_node_noupdate_l = Y_target_node_noupdate[index_X_child_l]
-
+        # Computing target data passing through node updated
         threshold = tree.threshold[node_index]
         index_X_child_l = X_target_node[:, phi] <= threshold
         X_target_child_l = X_target_node[index_X_child_l, :]
         Y_target_child_l = Y_target_node[index_X_child_l]
+
         STRUT(decisiontree,
               tree.children_left[node_index],
               X_target_child_l,
@@ -341,11 +353,12 @@ def STRUT(decisiontree,
         index_X_child_r = X_target_node_noupdate[:, phi] > old_threshold
         X_target_node_noupdate_r = X_target_node_noupdate[index_X_child_r, :]
         Y_target_node_noupdate_r = Y_target_node_noupdate[index_X_child_r]
-
+        # Computing target data passing through node updated
         threshold = tree.threshold[node_index]
         index_X_child_r = X_target_node[:, phi] > threshold
         X_target_child_r = X_target_node[index_X_child_r, :]
         Y_target_child_r = Y_target_node[index_X_child_r]
+
         STRUT(decisiontree,
               tree.children_right[node_index],
               X_target_child_r,
@@ -365,6 +378,7 @@ def STRUT_RF(random_forest,
              cl_no_prune=None):
     rf_strut = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_strut.estimators_):
+        print("tree : ", i)
         STRUT(rf_strut.estimators_[i],
               0,
               X_target,
