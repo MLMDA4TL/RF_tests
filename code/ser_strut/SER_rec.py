@@ -361,8 +361,8 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
                     DT_to_add.min_impurity_split = 0
                 DT_to_add.fit(X_target_node, y_target_node)
                 fusionDecisionTree(dTree, node, DT_to_add)
-            else:
-                print('Feuille laissée intacte')
+            # else:
+                # print('Feuille laissée intacte')
 #
         else:
             # Si elle n'est pas déjà pure
@@ -422,7 +422,7 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
         # Normalement, on passe sur un noeud atteint ( donc les 2 pas zero
         # simult.)
         if no_red_on_cl:
-            if ind_left.size and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
+            if ind_left.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
                 node = cut_from_left_right(dTree, node, -1)
 
             if ind_right.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_right[node]]) == 0:
@@ -472,7 +472,7 @@ def bootstrap(size):
 def SER_RF(random_forest, X_target, y_target, bootstrap_=False, no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None):
     rf_ser = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_ser.estimators_):
-        print("tree n° ", i)
+        # print("tree n° ", i)
 
         inds = np.linspace(0, y_target.size - 1, y_target.size).astype(int)
         if bootstrap_:

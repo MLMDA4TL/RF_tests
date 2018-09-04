@@ -25,7 +25,7 @@ nb_ones = 10
 MAX_DEPTH = None
 PRUNING_UPDATED_NODE = False
 
-REPETITION = 5000
+REPETITION = 1
 
 if LOAD:
     clf = pickle.load(open(clf_init_name, 'rb'))
@@ -124,21 +124,22 @@ if SAVE:
     pickle.dump(clf_out_noupdate, open(clf_out_name + '_noupdate', 'wb'))
     pickle.dump(clf_out_update, open(clf_out_name + '_update', 'wb'))
 
-# Plot the new tree
-dot_data = tree.export_graphviz(clf_out_noupdate, out_file=None,
-                                feature_names=["feature_" +
-                                               str(i) for i in range(D)],
-                                class_names=["class_0", "class_1"],
-                                filled=True, rounded=True,
-                                special_characters=True)
-graph = graphviz.Source(dot_data)
-graph.render('DT_out_noupdate', view=False)
-dot_data = tree.export_graphviz(clf_out_update, out_file=None,
-                                feature_names=["feature_" +
-                                               str(i) for i in range(D)],
-                                class_names=["class_0", "class_1"],
-                                filled=True, rounded=True,
-                                special_characters=True)
+if PLOT:
+    # Plot the new tree
+    dot_data = tree.export_graphviz(clf_out_noupdate, out_file=None,
+                                    feature_names=["feature_" +
+                                                   str(i) for i in range(D)],
+                                    class_names=["class_0", "class_1"],
+                                    filled=True, rounded=True,
+                                    special_characters=True)
+    graph = graphviz.Source(dot_data)
+    graph.render('DT_out_noupdate', view=False)
+    dot_data = tree.export_graphviz(clf_out_update, out_file=None,
+                                    feature_names=["feature_" +
+                                                   str(i) for i in range(D)],
+                                    class_names=["class_0", "class_1"],
+                                    filled=True, rounded=True,
+                                    special_characters=True)
 
-graph = graphviz.Source(dot_data)
-graph.render('DT_out_update', view=False)
+    graph = graphviz.Source(dot_data)
+    graph.render('DT_out_update', view=False)
