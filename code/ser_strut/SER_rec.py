@@ -102,7 +102,6 @@ def find_parent(dic, i_node):
     p = -1
     b = 0
     if i_node != 0 and i_node != -1:
-
         try:
             p = list(dic['nodes']['left_child']).index(i_node)
             b = -1
@@ -334,13 +333,23 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
     for i in range(dTree.n_classes_):
         val[:, i] = list(y_target_node).count(i)
 
+    # getting nb of elements of class cl_no_red
     old_size_cl_no_red = np.sum(dTree.tree_.value[node][:, cl_no_red])
+    # UPDATE
+    maj_class = np.argmax(dTree.tree_.value[node, :])
 
-    if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0 and old_size_cl_no_red > 0:
+    # case no reduction
+    # UPDATE
+    if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0 and old_size_cl_no_red > 0 and maj_class in cl_no_red:
+        # adding the value to the leaf and all its parents until root, thus
+        # avoid reduction after
         v = np.zeros((dTree.n_outputs_, dTree.n_classes_))
-        val[:, cl_no_red] = dTree.tree_.value[node][:, cl_no_red]
-
-        v[:, cl_no_red] = val[:, cl_no_red]
+        # add only value of preserved class
+        # val[:, cl_no_red] = dTree.tree_.value[node][:, cl_no_red]
+        # v[:, cl_no_red] = val[:, cl_no_red]
+        # add values of all classes, no distinction
+        v = dTree.tree_.value[node]
+        val = v
         add_to_parents(dTree, node, v)
 
     dTree.tree_.value[node] = val
@@ -352,7 +361,12 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
     # Si c'est une feuille
     if dTree.tree_.feature[node] == -2:
         if no_ser_on_cl:
-            if np.sum(dTree.tree_.value[node, :]) > 0 and np.argmax(dTree.tree_.value[node, :]) not in cl_no_ser:
+        # case no ser
+            # if elements in node (useless here) and major class in cl_no_ser
+            # then expands
+            # UPDATE
+            if np.sum(dTree.tree_.value[node, :]) > 0 and maj_class not in cl_no_ser:
+                # Expansion
                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
                 # to make a complete tree
                 try:
@@ -361,12 +375,18 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
                     DT_to_add.min_impurity_split = 0
                 DT_to_add.fit(X_target_node, y_target_node)
                 fusionDecisionTree(dTree, node, DT_to_add)
-            # else:
+            else:
+                v = np.zeros((dTree.n_outputs_, dTree.n_classes_))
+                # add values of all classes, no distinction
+                v = dTree.tree_.value[node]
+                val = v
+                add_to_parents(dTree, node, v)
                 # print('Feuille laissée intacte')
 #
         else:
             # Si elle n'est pas déjà pure
             if (len(set(list(y_target_node))) > 1):
+                # Expansion
                 # build full new tree from f
                 DT_to_add = sklearn.tree.DecisionTreeClassifier()
                 # to make a complete tree
@@ -413,14 +433,15 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
     e = error(dTree.tree_, node)
 
     if le <= e:
-
         #<----- CHGT STRUCTURE :"node" DOIT CHANGER ( OK )
         new_node_leaf = cut_into_leaf2(dTree, node)
         node = new_node_leaf
 
+    # if not leaf
     if dTree.tree_.feature[node] != -2:
-        # Normalement, on passe sur un noeud atteint ( donc les 2 pas zero
-        # simult.)
+        # case no reduction
+        # cut if no target data in children (given by ind_*) and no artificial
+        # value (added to avoid reduction)
         if no_red_on_cl:
             if ind_left.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
                 node = cut_from_left_right(dTree, node, -1)

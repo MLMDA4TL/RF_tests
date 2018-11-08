@@ -5,15 +5,17 @@ import sklearn.ensemble as skl_ens
 from sklearn.tree import export_graphviz
 from collections import namedtuple
 
-sys.path.insert(0, "../ser_strut/")
-sys.path.insert(0, "../data_mngmt/")
-sys.path.insert(0, "../utils/")
+sys.path.insert(0, "../../ser_strut/")
+sys.path.insert(0, "../../data_mngmt/")
+sys.path.insert(0, "../../utils/")
+from toy_data import toy_data_load
+from tarkett_data import tarkett_data_load
 import data
 from SER_rec import SER_RF
 from SER_rec import SER
 from STRUT import STRUT_RF
 from SER_rec import fusionDecisionTree
-from utils import error_rate
+from utils import error_rate, write_score
 
 
 # =======================================================
@@ -22,16 +24,17 @@ from utils import error_rate
 NB_TREE = 50
 MAX_DEPTH = None
 
-APPLY_SER = 0
+APPLY_SER = 1
+APPLY_SER_NO_RED = 1
 APPLY_STRUT = 1
 APPLY_MIX = 0
 
 # available data : 'letter', 'mushroom', 'wine'
 # DATASET = 'mushroom'
 # DATASET = 'wine'
-DATASET = 'letter'
+DATASET = 'wine'
 
-WRITE_SCORE = 1
+WRITE_SCORE = 0
 scores_file = "../../output/scores.csv"
 # =======================================================
 #   Data
@@ -45,10 +48,16 @@ X_source, X_target_005, X_target_095, y_source, y_target_005, y_target_095 = loa
 # =======================================================
 
 
-rf_source = skl_ens.RandomForestClassifier(n_estimators=NB_TREE, max_depth = MAX_DEPTH , oob_score=True)
-rf_target = skl_ens.RandomForestClassifier(n_estimators=NB_TREE, max_depth = MAX_DEPTH , oob_score=True, class_weight=None)
+rf_source = skl_ens.RandomForestClassifier(
+    n_estimators=NB_TREE, max_depth=MAX_DEPTH, oob_score=True)
+rf_target = skl_ens.RandomForestClassifier(
+    n_estimators=NB_TREE, max_depth=MAX_DEPTH, oob_score=True, class_weight=None)
+
+rf_source_1 = skl_ens.RandomForestClassifier(
+    n_estimators=1, max_depth=MAX_DEPTH, oob_score=True)
 
 rf_source.fit(X_source, y_source)
+rf_source_1.fit(X_source, y_source)
 rf_source_score_target = rf_source.score(X_target_095, y_target_095)
 print("Error rate de rf_source sur data target : ",
       error_rate(rf_source_score_target))
@@ -97,7 +106,12 @@ if APPLY_SER:
           error_rate(rf_source_SER_score))
     duration_ser = int(time.time() - start_time)
     print("--- SER : {} m {} s (total {} s) ---".format(duration_ser // 60,
-        duration_ser % 60, duration_ser))
+                                                        duration_ser % 60, duration_ser))
+
+if APPLY_SER_NO_RED:
+    rf_ser_nored = SER_RF(rf_source_1, X_target_005, y_target_005, bootstrap_=False,
+            no_red_on_cl=True, cl_no_red=[1], no_ser_on_cl=False,
+            cl_no_ser=None)
 
 if APPLY_STRUT:
     start_time = time.time()
@@ -107,7 +121,7 @@ if APPLY_STRUT:
           error_rate(rf_source_STRUT_score))
     duration_strut = int(time.time() - start_time)
     print("--- STRUT :  {} m {} s (total {} s) ---".format(duration_strut // 60,
-        duration_strut % 60, duration_strut))
+                                                           duration_strut % 60, duration_strut))
 
 if APPLY_MIX:
     rf_mix = skl_ens.RandomForestClassifier(n_estimators=100, oob_score=True)
