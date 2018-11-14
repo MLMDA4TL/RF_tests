@@ -324,7 +324,8 @@ def cut_into_leaf2(dTree, node):
     return inds.index(node)
 
 
-def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None):
+def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False,
+        cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None, exp_refinement=None):
 
     # Maj values
     #old_val = dTree.tree_.value[node]
@@ -336,6 +337,7 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
     # getting nb of elements of class cl_no_red
     old_size_cl_no_red = np.sum(dTree.tree_.value[node][:, cl_no_red])
     # UPDATE
+    old_values = dTree.tree_.value[node].copy()
     maj_class = np.argmax(dTree.tree_.value[node, :])
 
     # case no reduction
@@ -343,14 +345,12 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
     if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0 and old_size_cl_no_red > 0 and maj_class in cl_no_red:
         # adding the value to the leaf and all its parents until root, thus
         # avoid reduction after
-        v = np.zeros((dTree.n_outputs_, dTree.n_classes_))
         # add only value of preserved class
         # val[:, cl_no_red] = dTree.tree_.value[node][:, cl_no_red]
         # v[:, cl_no_red] = val[:, cl_no_red]
         # add values of all classes, no distinction
-        v = dTree.tree_.value[node]
-        val = v
-        add_to_parents(dTree, node, v)
+        val = dTree.tree_.value[node].copy()
+        add_to_parents(dTree, node, val)
 
     dTree.tree_.value[node] = val
     dTree.tree_.n_node_samples[node] = np.sum(val)
@@ -360,42 +360,45 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False, cl_no_red
 
     # Si c'est une feuille
     if dTree.tree_.feature[node] == -2:
-        if no_ser_on_cl:
-        # case no ser
-            # if elements in node (useless here) and major class in cl_no_ser
-            # then expands
-            # UPDATE
-            if np.sum(dTree.tree_.value[node, :]) > 0 and maj_class not in cl_no_ser:
-                # Expansion
-                DT_to_add = sklearn.tree.DecisionTreeClassifier()
-                # to make a complete tree
-                try:
-                    DT_to_add.min_impurity_decrease = 0
-                except:
-                    DT_to_add.min_impurity_split = 0
-                DT_to_add.fit(X_target_node, y_target_node)
-                fusionDecisionTree(dTree, node, DT_to_add)
+        if y_target_node.size > 0:
+            if no_ser_on_cl:
+                # case no ser
+                # if elements in node (useless here) and major class in cl_no_ser
+                # then expands
+                # UPDATE
+                # if np.sum(dTree.tree_.value[node, :]) > 0 and maj_class not
+                # in cl_no_ser:
+                if (maj_class not in cl_no_ser) or (exp_refinement and maj_class in y_target_node):
+                    # Expansion
+                    DT_to_add = sklearn.tree.DecisionTreeClassifier()
+                    # to make a complete tree
+                    try:
+                        DT_to_add.min_impurity_decrease = 0
+                    except:
+                        DT_to_add.min_impurity_split = 0
+                    DT_to_add.fit(X_target_node, y_target_node)
+                    fusionDecisionTree(dTree, node, DT_to_add)
+                else:
+                    dTree.tree_.value[node] = old_values
+                    dTree.tree_.n_node_samples[node] = np.sum(old_values)
+                    dTree.tree_.weighted_n_node_samples[
+                        node] = np.sum(old_values)
+                    add_to_parents(dTree, node, old_values)
+                    #print('Feuille laissée intacte')
+    #
             else:
-                v = np.zeros((dTree.n_outputs_, dTree.n_classes_))
-                # add values of all classes, no distinction
-                v = dTree.tree_.value[node]
-                val = v
-                add_to_parents(dTree, node, v)
-                # print('Feuille laissée intacte')
-#
-        else:
-            # Si elle n'est pas déjà pure
-            if (len(set(list(y_target_node))) > 1):
-                # Expansion
-                # build full new tree from f
-                DT_to_add = sklearn.tree.DecisionTreeClassifier()
-                # to make a complete tree
-                try:
-                    DT_to_add.min_impurity_decrease = 0
-                except:
-                    DT_to_add.min_impurity_split = 0
-                DT_to_add.fit(X_target_node, y_target_node)
-                fusionDecisionTree(dTree, node, DT_to_add)
+                # Si elle n'est pas déjà pure
+                if (len(set(list(y_target_node))) > 1):
+                    # Expansion
+                    # build full new tree from f
+                    DT_to_add = sklearn.tree.DecisionTreeClassifier()
+                    # to make a complete tree
+                    try:
+                        DT_to_add.min_impurity_decrease = 0
+                    except:
+                        DT_to_add.min_impurity_split = 0
+                    DT_to_add.fit(X_target_node, y_target_node)
+                    fusionDecisionTree(dTree, node, DT_to_add)
 
         return node
 
@@ -490,7 +493,9 @@ def bootstrap(size):
     return np.random.choice(np.linspace(0, size - 1, size).astype(int), size, replace=True)
 
 
-def SER_RF(random_forest, X_target, y_target, bootstrap_=False, no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None):
+def SER_RF(random_forest, X_target, y_target, bootstrap_=False,
+           no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None,
+           exp_refinement=False):
     rf_ser = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_ser.estimators_):
         # print("tree n° ", i)
@@ -501,5 +506,6 @@ def SER_RF(random_forest, X_target, y_target, bootstrap_=False, no_red_on_cl=Fal
 
         SER(0, rf_ser.estimators_[i], X_target[inds], y_target[inds],
             no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
-            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
+            no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser,
+            exp_refinement=exp_refinement)
     return rf_ser
