@@ -198,7 +198,9 @@ def STRUT(decisiontree,
           pruning_updated_node=True,
           no_prune_on_cl=False,
           cl_no_prune=None,
-          prune_lone_instance=True):
+          prune_lone_instance=True,
+          adapt_prop = False,
+          coeffs = [1,1]):
     tree = decisiontree.tree_
     phi = tree.feature[node_index]
     classes = decisiontree.classes_
@@ -248,27 +250,27 @@ def STRUT(decisiontree,
     # print("is_reached_update : ", is_reached_update)
     # print("is_reached_noupdate : ", is_reached_noupdate)
 
-    # NEW prune_cond
+    # NEW prune_cond
     add_source_value = False
     # print("is_reached_update : ", is_reached_update)
     # print("is_reached_noupdate : ", is_reached_noupdate)
     # print("is_instance_cl_no_prune : ", is_instance_cl_no_prune)
     if pruning_updated_node:
         if no_prune_on_cl:
-            # flag meaning need to add source value (to avoid zero !)
+            # flag meaning need to add source value (to avoid zero !)
             add_source_value = not is_reached_update and is_instance_cl_no_prune
             prune_cond = not is_reached_update and not is_instance_cl_no_prune
         else:
             prune_cond = not is_reached_update
     else:
         if no_prune_on_cl:
-            # flag meaning need to add source value (to avoid zero !)
+            # flag meaning need to add source value (to avoid zero !)
             add_source_value = not is_reached_noupdate and is_instance_cl_no_prune
             prune_cond = not is_reached_noupdate and not is_instance_cl_no_prune
         else:
             prune_cond = not is_reached_noupdate
 
-    # OLD prune_cond
+    # OLD prune_cond
     # prune_cond = not is_reached_update or (not pruning_updated_node and (not is_reached_noupdate) and ((not no_prune_on_cl) or (not is_instance_cl_no_prune)))
     # if no target data at all or ((not reached) and (pruning activated or no
     # instance to preserve)), then prune
@@ -293,7 +295,7 @@ def STRUT(decisiontree,
         if b_gp == 1:  # parent is right_children of grandparent
             tree.children_right[grand_parent_node] = brother_node
         # supress the current node
-        # tree.children_left[node_index] = -1  # seem useless since already done in prune_subtree func
+        # tree.children_left[node_index] = -1  # seem useless since already done in prune_subtree func
         # tree.children_right[node_index] = -1
         tree.children_left[parent_node] = -1  # important
         tree.children_right[parent_node] = -1
@@ -332,8 +334,13 @@ def STRUT(decisiontree,
     if type(threshold) is np.float64:
         Q_source_l, Q_source_r = get_children_distributions(decisiontree,
                                                             node_index)
+        if adapt_prop :
+            Q_source_l = np.multiply(coeffs,Q_source_l)
+            Q_source_r = np.multiply(coeffs,Q_source_r)
+
         Q_source_parent = get_node_distribution(decisiontree,
                                                 node_index)
+
         # print("threshold selection : X_target_node shape : ",
                 # X_target_node.shape)
         t1 = threshold_selection(Q_source_parent,
@@ -378,7 +385,7 @@ def STRUT(decisiontree,
             tree.children_left[node_index] = old_child_r_id
 
     if tree.children_left[node_index] != -1:
-        # Computing target data passing through node NOT updated
+        # Computing target data passing through node NOT updated
         index_X_child_l = X_target_node_noupdate[:, phi] <= old_threshold
         X_target_node_noupdate_l = X_target_node_noupdate[index_X_child_l, :]
         Y_target_node_noupdate_l = Y_target_node_noupdate[index_X_child_l]
@@ -396,10 +403,12 @@ def STRUT(decisiontree,
               Y_target_node_noupdate_l,
               pruning_updated_node=pruning_updated_node,
               no_prune_on_cl=no_prune_on_cl,
-              cl_no_prune=cl_no_prune)
+              cl_no_prune=cl_no_prune,        
+              adapt_prop = False,
+              coeffs = [1,1])
 
     if tree.children_right[node_index] != -1:
-        # Computing target data passing through node NOT updated
+        # Computing target data passing through node NOT updated
         index_X_child_r = X_target_node_noupdate[:, phi] > old_threshold
         X_target_node_noupdate_r = X_target_node_noupdate[index_X_child_r, :]
         Y_target_node_noupdate_r = Y_target_node_noupdate[index_X_child_r]
@@ -417,7 +426,9 @@ def STRUT(decisiontree,
               Y_target_node_noupdate_r,
               pruning_updated_node=pruning_updated_node,
               no_prune_on_cl=no_prune_on_cl,
-              cl_no_prune=cl_no_prune)
+              cl_no_prune=cl_no_prune,
+              adapt_prop = False,
+              coeffs = [1,1])
 
 
 def STRUT_RF(random_forest,
@@ -426,20 +437,46 @@ def STRUT_RF(random_forest,
              pruning_updated_node=True,
              no_prune_on_cl=False,
              cl_no_prune=None,
-             prune_lone_instance=True):
+             prune_lone_instance=True,
+             adapt_prop = False):
+    
+
     rf_strut = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_strut.estimators_):
-        print("tree : ", i)
-        STRUT(rf_strut.estimators_[i],
-              0,
-              X_target,
-              y_target,
-              X_target,
-              y_target,
-              pruning_updated_node=pruning_updated_node,
-              no_prune_on_cl=no_prune_on_cl,
-              cl_no_prune=cl_no_prune,
-              prune_lone_instance=prune_lone_instance)
+        
+        if adapt_prop:
+            props_s = get_node_distribution(rf_strut.estimators_[i], 0)
+            props_s = props_s/ sum(props_s)
+            props_t = np.zeros(props_s.size)
+            for k in range(props_s.size):
+                props_t[k] = np.sum(y_target == k)/y_target.size
+                coeffs = np.divide(props_t,props_s)
+            
+            #print("tree : ", i)
+            STRUT(rf_strut.estimators_[i],
+                  0,
+                  X_target,
+                  y_target,
+                  X_target,
+                  y_target,
+                  pruning_updated_node=pruning_updated_node,
+                  no_prune_on_cl=no_prune_on_cl,
+                  cl_no_prune=cl_no_prune,
+                  prune_lone_instance=prune_lone_instance,
+                  adapt_prop = True,
+                  coeffs = coeffs)
+        else:
+            STRUT(rf_strut.estimators_[i],
+                  0,
+                  X_target,
+                  y_target,
+                  X_target,
+                  y_target,
+                  pruning_updated_node=pruning_updated_node,
+                  no_prune_on_cl=no_prune_on_cl,
+                  cl_no_prune=cl_no_prune,
+                  prune_lone_instance=prune_lone_instance)
+            
     return rf_strut
 
 if __name__ == "__main__":
