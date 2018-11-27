@@ -199,8 +199,8 @@ def STRUT(decisiontree,
           no_prune_on_cl=False,
           cl_no_prune=None,
           prune_lone_instance=True,
-          adapt_prop = False,
-          coeffs = [1,1]):
+          adapt_prop=False,
+          coeffs=[1, 1]):
     tree = decisiontree.tree_
     phi = tree.feature[node_index]
     classes = decisiontree.classes_
@@ -231,10 +231,11 @@ def STRUT(decisiontree,
     # print("classes ", classes)
     # if node_index == 36:
     # print("X_target at feat: ", X_target_node[:, phi])
-    # print("current_class_distribution_source ", current_class_distribution_source)
+    # print("current_class_distribution_source ",
+          # current_class_distribution_source)
     # print("current_class_distribution ", current_class_distribution)
     # print("current_class_distribution_noupdate ",
-            # current_class_distribution_noupdate)
+          # current_class_distribution_noupdate)
 
     # If it is a leaf one, exit
     if tree.children_left[node_index] == -1 and tree.children_right[node_index] == -1:
@@ -276,7 +277,7 @@ def STRUT(decisiontree,
     # instance to preserve)), then prune
 
     if prune_cond:
-        print("Pruning at node ", node_index)
+        # print("Pruning at node ", node_index)
         # print("PRUNING at node ", node_index)
         prune_subtree(decisiontree,
                       node_index)
@@ -301,48 +302,49 @@ def STRUT(decisiontree,
         tree.children_right[parent_node] = -1
         return 0
 
-    else:
-        print("NO Pruning at node ", node_index)
+    # else:
+        # print("NO Pruning at node ", node_index)
 
     # update tree.value with target data
     tree.value[node_index] = current_class_distribution
     if add_source_value:
-        add_to_parents(decisiontree, node_index, current_class_distribution_source)
+        add_to_parents(decisiontree, node_index,
+                       current_class_distribution_source)
+        return 0
 
     # Only one class is present in the node -> terminal leaf
     # if (current_class_distribution > 0).sum() == 1:
         # print("Only one class in node {} --> PRUNING".format(node_index))
         # prune_subtree(decisiontree,
-                      # node_index)
+        # node_index)
         # tree.feature[node_index] = -2
         # return 0
     # Only one instance -> pruning into leaf
     if current_class_distribution.sum() == 1:
-        print("Only one instance in node {} --> PRUNING ? ".format(node_index))
+        # print("Only one instance in node {} --> PRUNING ? ".format(node_index))
         if prune_lone_instance:
-            print("YES")
+            # print("YES")
             prune_subtree(decisiontree,
                           node_index)
             tree.feature[node_index] = -2
-        else:
-            if is_instance_cl_no_prune:
-                print("NO")
+        # else:
+            # if is_instance_cl_no_prune:
+                # print("NO")
         return 0
-
 
     # update threshold
     if type(threshold) is np.float64:
         Q_source_l, Q_source_r = get_children_distributions(decisiontree,
                                                             node_index)
-        if adapt_prop :
-            Q_source_l = np.multiply(coeffs,Q_source_l)
-            Q_source_r = np.multiply(coeffs,Q_source_r)
+        if adapt_prop:
+            Q_source_l = np.multiply(coeffs, Q_source_l)
+            Q_source_r = np.multiply(coeffs, Q_source_r)
 
         Q_source_parent = get_node_distribution(decisiontree,
                                                 node_index)
 
         # print("threshold selection : X_target_node shape : ",
-                # X_target_node.shape)
+        # X_target_node.shape)
         t1 = threshold_selection(Q_source_parent,
                                  Q_source_l,
                                  Q_source_r,
@@ -403,9 +405,9 @@ def STRUT(decisiontree,
               Y_target_node_noupdate_l,
               pruning_updated_node=pruning_updated_node,
               no_prune_on_cl=no_prune_on_cl,
-              cl_no_prune=cl_no_prune,        
-              adapt_prop = False,
-              coeffs = [1,1])
+              cl_no_prune=cl_no_prune,
+              adapt_prop=False,
+              coeffs=[1, 1])
 
     if tree.children_right[node_index] != -1:
         # Computing target data passing through node NOT updated
@@ -427,8 +429,8 @@ def STRUT(decisiontree,
               pruning_updated_node=pruning_updated_node,
               no_prune_on_cl=no_prune_on_cl,
               cl_no_prune=cl_no_prune,
-              adapt_prop = False,
-              coeffs = [1,1])
+              adapt_prop=False,
+              coeffs=[1, 1])
 
 
 def STRUT_RF(random_forest,
@@ -438,20 +440,19 @@ def STRUT_RF(random_forest,
              no_prune_on_cl=False,
              cl_no_prune=None,
              prune_lone_instance=True,
-             adapt_prop = False):
-    
+             adapt_prop=False):
 
     rf_strut = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_strut.estimators_):
-        
+
         if adapt_prop:
             props_s = get_node_distribution(rf_strut.estimators_[i], 0)
-            props_s = props_s/ sum(props_s)
+            props_s = props_s / sum(props_s)
             props_t = np.zeros(props_s.size)
             for k in range(props_s.size):
-                props_t[k] = np.sum(y_target == k)/y_target.size
-                coeffs = np.divide(props_t,props_s)
-            
+                props_t[k] = np.sum(y_target == k) / y_target.size
+                coeffs = np.divide(props_t, props_s)
+
             #print("tree : ", i)
             STRUT(rf_strut.estimators_[i],
                   0,
@@ -463,8 +464,8 @@ def STRUT_RF(random_forest,
                   no_prune_on_cl=no_prune_on_cl,
                   cl_no_prune=cl_no_prune,
                   prune_lone_instance=prune_lone_instance,
-                  adapt_prop = True,
-                  coeffs = coeffs)
+                  adapt_prop=True,
+                  coeffs=coeffs)
         else:
             STRUT(rf_strut.estimators_[i],
                   0,
@@ -476,7 +477,7 @@ def STRUT_RF(random_forest,
                   no_prune_on_cl=no_prune_on_cl,
                   cl_no_prune=cl_no_prune,
                   prune_lone_instance=prune_lone_instance)
-            
+
     return rf_strut
 
 if __name__ == "__main__":
