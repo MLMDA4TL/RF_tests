@@ -131,15 +131,18 @@ def threshold_selection(Q_source_parent,
                         measure_default_IG=True):
     # print("Q_source_parent : ", Q_source_parent)
     # sort the corrdinates of X along phi
+    #X_phi_sorted = np.sort(X_target_node[:, phi])
+    
+    #modif pour ne considérer que les valeurs distinctes
     X_phi_sorted = np.array(list(set(X_target_node[:, phi])))
     X_phi_sorted = np.sort(X_phi_sorted)
+    
     # print(X_phi_sorted)
     nb_tested_thresholds = X_phi_sorted.shape[0] - 1
-    # if no different values of phi, return the value
+    
     if nb_tested_thresholds == 0:
-        print("SAME VALUES OF PHI IN NODE")
         return X_phi_sorted[0]
-    # print("nb_tested_thresholds ", nb_tested_thresholds)
+    
     measures_IG = np.zeros(nb_tested_thresholds)
     measures_DG = np.zeros(nb_tested_thresholds)
     for i in range(nb_tested_thresholds):
@@ -157,25 +160,28 @@ def threshold_selection(Q_source_parent,
                             Q_target_l,
                             Q_target_r)
     index = 0
-    # index_nodiv = 0
-    found_max = 0
+    max_found = 0
+    
     if use_divergence:
         for i in range(1, nb_tested_thresholds - 1):
             found_max = 1
             if measures_IG[i] >= measures_IG[i - 1] and measures_IG[i] >= measures_IG[i + 1] and measures_DG[i] > measures_DG[index]:
+                max_found = 1
                 index = i
-        if not found_max:
-            # print("MAX NOT FOUND")
+                
+        if not max_found :
+
             if measure_default_IG:
                 index = np.argmax(measures_IG)
             else:
                 index = np.argmax(measures_DG)
-    else:
+    #print('div index',index)
+    else:    
         index = np.argmax(measures_IG)
-    # print("index : ", index)
-    # print("index nodiv: ", index_nodiv)
-    # print("INDEX DIFFERENTS ? ", index - index_nodiv)
-
+    
+    
+    #print('no div index',np.argmax(measures_IG))
+    #print('------')
     threshold = (X_phi_sorted[index] + X_phi_sorted[index + 1]) * 1. / 2
     return threshold
 
@@ -225,6 +231,7 @@ def STRUT(decisiontree,
           cl_no_prune=None,
           prune_lone_instance=True,
           adapt_prop=False,
+          simple_weights=False,
           coeffs=[1, 1],
           use_divergence=True,
           measure_default_IG=True):
@@ -342,6 +349,8 @@ def STRUT(decisiontree,
         prune_subtree(decisiontree,
                       node_index)
         tree.feature[node_index] = -2
+
+        
         return 0
     # Only one instance -> pruning into leaf
     # if current_class_distribution.sum() == 1:
@@ -359,19 +368,52 @@ def STRUT(decisiontree,
     # update threshold
     if type(threshold) is np.float64:
         Q_source_l, Q_source_r = get_children_distributions(decisiontree,
-                                                            node_index)
-        if adapt_prop:
+                                                                node_index)
+        Sl = np.sum(Q_source_l)
+        Sr = np.sum(Q_source_r)
+
+
+        if simple_weights:
+
             Q_source_l = np.multiply(coeffs, Q_source_l)
             Q_source_r = np.multiply(coeffs, Q_source_r)
+            
+#        if adapt_prop_hetero:
+#            Q_source_l = np.multiply(coeffs, Q_source_l)
+#            D = np.sum(Q_source_l)
+#            Q_source_l = np.divide(Q_source_l,D)
+#            Q_source_r = np.multiply(coeffs, Q_source_r)
+#            D = np.sum(Q_source_r)
+#            Q_source_r = np.divide(Q_source_r,D)  
+            
+        if adapt_prop:
+            Sl = np.sum(Q_source_l)
+            Sr = np.sum(Q_source_r)
+            Slt = Y_target_node.size
+            Srt = Y_target_node.size
 
+            #Q_source_l = Q_source_l/np.sum(Q_source_l) 
+            #Q_source_r = Q_source_r/np.sum(Q_source_r) 
+            
+            #Q_source_l = np.multiply(coeffs, Q_source_l)
+            
+            D = np.sum(np.multiply(coeffs, Q_source_l))
+            Q_source_l = (Slt/Sl)*np.multiply(coeffs,np.divide(Q_source_l,D))
+            D = np.sum(np.multiply(coeffs, Q_source_r))
+            Q_source_r = (Srt/Sr)*np.multiply(coeffs,np.divide(Q_source_r,D))            
+            
+            #Q_source_r = np.multiply(coeffs, Q_source_r)
+            #D = np.sum(Q_source_r)
+            #Q_source_r = Sr*np.divide(Q_source_r,D)    
+            
         Q_source_parent = get_node_distribution(decisiontree,
                                                 node_index)
 
         # print("threshold selection : X_target_node shape : ",
         # X_target_node.shape)
         t1 = threshold_selection(Q_source_parent,
-                                 Q_source_l,
-                                 Q_source_r,
+                                 Q_source_l.copy(),
+                                 Q_source_r.copy(),
                                  X_target_node,
                                  Y_target_node,
                                  phi,
@@ -383,30 +425,33 @@ def STRUT(decisiontree,
                                                            phi,
                                                            t1,
                                                            classes)
-        DG_t1 = DG(Q_source_l,
-                   Q_source_r,
+        DG_t1 = DG(Q_source_l.copy(),
+                   Q_source_r.copy(),
                    Q_target_l,
                    Q_target_r)
         t2 = threshold_selection(Q_source_parent,
-                                 Q_source_r,
-                                 Q_source_l,
+                                 Q_source_r.copy(),
+                                 Q_source_l.copy(),
                                  X_target_node,
                                  Y_target_node,
                                  phi,
                                  classes,
                                  use_divergence=use_divergence,
                                  measure_default_IG=measure_default_IG)
-        # print("t1-t2 = ", t1 - t2)
-        # print("use_divergence ", use_divergence)
+
+
+            
         Q_target_l, Q_target_r = compute_Q_children_target(X_target_node,
                                                            Y_target_node,
                                                            phi,
                                                            t2,
                                                            classes)
-        DG_t2 = DG(Q_source_r,
-                   Q_source_l,
+        DG_t2 = DG(Q_source_r.copy(),
+                   Q_source_l.copy(),
                    Q_target_l,
                    Q_target_r)
+        
+
         if DG_t1 >= DG_t2:
             tree.threshold[node_index] = t1
         else:
@@ -437,8 +482,9 @@ def STRUT(decisiontree,
               no_prune_on_cl=no_prune_on_cl,
               cl_no_prune=cl_no_prune,
               adapt_prop=adapt_prop,
+              simple_weights=simple_weights,
               coeffs=coeffs,
-              use_divergence=use_divergence,
+              use_divergence = use_divergence,
               measure_default_IG=measure_default_IG)
 
     if tree.children_right[node_index] != -1:
@@ -462,6 +508,7 @@ def STRUT(decisiontree,
               no_prune_on_cl=no_prune_on_cl,
               cl_no_prune=cl_no_prune,
               adapt_prop=adapt_prop,
+              simple_weights=simple_weights,
               coeffs=coeffs,
               use_divergence=use_divergence,
               measure_default_IG=measure_default_IG)
@@ -475,19 +522,24 @@ def STRUT_RF(random_forest,
              cl_no_prune=None,
              prune_lone_instance=True,
              adapt_prop=False,
+             simple_weights=False,
              use_divergence=True,
              measure_default_IG=True):
 
     rf_strut = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_strut.estimators_):
 
-        if adapt_prop:
+        if adapt_prop or simple_weights:
             props_s = get_node_distribution(rf_strut.estimators_[i], 0)
             props_s = props_s / sum(props_s)
             props_t = np.zeros(props_s.size)
+            
             for k in range(props_s.size):
                 props_t[k] = np.sum(y_target == k) / y_target.size
-                coeffs = np.divide(props_t, props_s)
+                
+            coeffs = np.divide(props_t, props_s)
+                
+
 
             #print("tree : ", i)
             STRUT(rf_strut.estimators_[i],
@@ -501,6 +553,7 @@ def STRUT_RF(random_forest,
                   cl_no_prune=cl_no_prune,
                   prune_lone_instance=prune_lone_instance,
                   adapt_prop=adapt_prop,
+                  simple_weights=simple_weights,
                   coeffs=coeffs,
                   use_divergence=use_divergence,
                   measure_default_IG=measure_default_IG)

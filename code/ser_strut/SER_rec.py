@@ -21,10 +21,10 @@ import pickle
 
 from sklearn import datasets
 import copy
-import STRUT as strut
 
 from sklearn.tree import export_graphviz
 
+from STRUT import get_node_distribution
 #==============================================================================
 #
 #==============================================================================
@@ -326,7 +326,7 @@ def cut_into_leaf2(dTree, node):
 
 
 def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False,
-        cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None, exp_refinement=None):
+        cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None, exp_refinement=None, leaf_loss_quantify = False, leaf_loss_thresh = None, coeffs = None, root_source_values = None, Nkmin = None ):
 
     # Maj values
     #old_val = dTree.tree_.value[node]
@@ -343,11 +343,30 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False,
     # CARE : Deep copy of value
     old_values = dTree.tree_.value[node].copy()
     maj_class = np.argmax(dTree.tree_.value[node, :])
+    
+    
+    if leaf_loss_quantify and (no_red_on_cl or no_ser_on_cl and dTree.tree_.feature[node] == -2):
+        
+        if no_red_on_cl:
+            cl = cl_no_red[0]
+        else:
+            cl = cl_no_ser[0]
+            
+        ps_rf = dTree.tree_.value[node,0,:]/sum(dTree.tree_.value[node,0,:])                
+        p1_in_l = dTree.tree_.value[node,0,cl]/root_source_values[cl]
+        cond1 = np.power(1 - p1_in_l,Nkmin) > leaf_loss_thresh
+        cond2 = np.argmax(np.multiply(coeffs,ps_rf)) == cl
+
 
     if no_red_on_cl and dTree.tree_.feature[node] == -2 and y_target_node.size == 0 and old_size_cl_no_red > 0 and maj_class in cl_no_red:
-
-        val = dTree.tree_.value[node].copy()
-        add_to_parents(dTree, node, val)
+        
+        if leaf_loss_quantify and cond1 and cond2:
+            val = dTree.tree_.value[node].copy()
+            add_to_parents(dTree, node, val)
+                
+        else:
+            val = dTree.tree_.value[node].copy()
+            add_to_parents(dTree, node, val)
 
     dTree.tree_.value[node] = val
     dTree.tree_.n_node_samples[node] = np.sum(val)
@@ -360,33 +379,45 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False,
         if y_target_node.size > 0:
             if no_ser_on_cl:
                 # case no ser
-                # if elements in node (useless here) and major class in cl_no_ser
-                # then expands
+                # if elements in node (useless here) and major class in cl_no_ser
+                # then expands
                 # UPDATE
                 # if np.sum(dTree.tree_.value[node, :]) > 0 and maj_class not
                 # in cl_no_ser:
                 if (maj_class not in cl_no_ser) or (exp_refinement and maj_class in y_target_node):
                     # Expansion
-                    DT_to_add = sklearn.tree.DecisionTreeClassifier()
-                    # to make a complete tree
-                    try:
-                        DT_to_add.min_impurity_decrease = 0
-                    except:
-                        DT_to_add.min_impurity_split = 0
-                    DT_to_add.fit(X_target_node, y_target_node)
-                    fusionDecisionTree(dTree, node, DT_to_add)
+                        DT_to_add = sklearn.tree.DecisionTreeClassifier()
+                        # to make a complete tree
+                        try:
+                            DT_to_add.min_impurity_decrease = 0
+                        except:
+                            DT_to_add.min_impurity_split = 0
+                        DT_to_add.fit(X_target_node, y_target_node)
+                        fusionDecisionTree(dTree, node, DT_to_add)
+
+                    
                 else:
-                    dTree.tree_.value[node] = old_values
-                    dTree.tree_.n_node_samples[node] = np.sum(old_values)
-                    dTree.tree_.weighted_n_node_samples[
-                        node] = np.sum(old_values)
-                    add_to_parents(dTree, node, old_values)
-                    #print('Feuille laissée intacte')
+                    if leaf_loss_quantify and not (cond1 and cond2):
+                        DT_to_add = sklearn.tree.DecisionTreeClassifier()
+                        # to make a complete tree
+                        try:
+                            DT_to_add.min_impurity_decrease = 0
+                        except:
+                            DT_to_add.min_impurity_split = 0
+                        DT_to_add.fit(X_target_node, y_target_node)
+                        fusionDecisionTree(dTree, node, DT_to_add)
+                    else:
+                        dTree.tree_.value[node] = old_values
+                        dTree.tree_.n_node_samples[node] = np.sum(old_values)
+                        dTree.tree_.weighted_n_node_samples[
+                            node] = np.sum(old_values)
+                        add_to_parents(dTree, node, old_values)
+                        #print('Feuille laissée intacte')
     #
             else:
                 # Si elle n'est pas déjà pure
                 if (len(set(list(y_target_node))) > 1):
-                    # Expansion
+                    # Expansion
                     # build full new tree from f
                     DT_to_add = sklearn.tree.DecisionTreeClassifier()
                     # to make a complete tree
@@ -418,12 +449,14 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False,
     #<----- CHGT STRUCTURE :"node" DOIT CHANGER ( OK REC )
     new_node_left = SER(dTree.tree_.children_left[node], dTree, X_target_node_left, y_target_node_left,
                         no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
-                        no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
+                        no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser, leaf_loss_quantify=leaf_loss_quantify,
+                        leaf_loss_thresh=leaf_loss_thresh, coeffs=coeffs,root_source_values=root_source_values,Nkmin=Nkmin)
     dic = dTree.tree_.__getstate__().copy()
     node, b = find_parent(dic, new_node_left)
     new_node_right = SER(dTree.tree_.children_right[node], dTree, X_target_node_right, y_target_node_right,
                          no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
-                         no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser)
+                         no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser, leaf_loss_quantify=leaf_loss_quantify, 
+                         leaf_loss_thresh=leaf_loss_thresh, coeffs=coeffs,root_source_values=root_source_values,Nkmin=Nkmin)
     dic = dTree.tree_.__getstate__().copy()
     node, b = find_parent(dic, new_node_right)
 
@@ -445,7 +478,7 @@ def SER(node, dTree, X_target_node, y_target_node, no_red_on_cl=False,
         # Normalement, on passe sur un noeud atteint ( donc les 2 pas zero
         # simult.)
         if no_red_on_cl:
-            if ind_left.size and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
+            if ind_left.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_left[node]]) == 0:
                 node = cut_from_left_right(dTree, node, -1)
 
             if ind_right.size == 0 and np.sum(dTree.tree_.value[dTree.tree_.children_right[node]]) == 0:
@@ -492,17 +525,31 @@ def bootstrap(size):
     return np.random.choice(np.linspace(0, size - 1, size).astype(int), size, replace=True)
 
 
-def bootstrap(size):
-    return np.random.choice(np.linspace(0, size - 1, size).astype(int), size, replace=True)
-
 
 def SER_RF(random_forest, X_target, y_target, bootstrap_=False,
            no_red_on_cl=False, cl_no_red=None, no_ser_on_cl=False, cl_no_ser=None,
-           exp_refinement=False):
+           exp_refinement=False, leaf_loss_quantify = False, leaf_loss_thresh = 0.9):
     rf_ser = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_ser.estimators_):
         #print("tree n° ", i)
 
+        root_source_values = None
+        coeffs = None
+        Nkmin = None
+        if  leaf_loss_quantify :    
+            Nkmin = sum(y_target == cl_no_red )
+            root_source_values = get_node_distribution(rf_ser.estimators_[i], 0).reshape(-1)
+            #print('SOURCE:',root_source_values)
+            props_s = root_source_values
+            props_s = props_s / sum(props_s)
+            props_t = np.zeros(props_s.size)
+            for k in range(props_s.size):
+                props_t[k] = np.sum(y_target == k) / y_target.size
+            
+            coeffs = np.divide(props_t, props_s)
+                
+            #source_values_tot = rf_ser.estimators_[i].tree_.value[0,0,cl_no_red]
+            
         inds = np.linspace(0, y_target.size - 1, y_target.size).astype(int)
         if bootstrap_:
             inds = bootstrap(y_target.size)
@@ -510,5 +557,6 @@ def SER_RF(random_forest, X_target, y_target, bootstrap_=False,
         SER(0, rf_ser.estimators_[i], X_target[inds], y_target[inds],
             no_red_on_cl=no_red_on_cl, cl_no_red=cl_no_red,
             no_ser_on_cl=no_ser_on_cl, cl_no_ser=cl_no_ser,
-            exp_refinement=exp_refinement)
+            exp_refinement=exp_refinement,leaf_loss_quantify=leaf_loss_quantify,leaf_loss_thresh=leaf_loss_thresh,coeffs=coeffs,root_source_values=root_source_values,Nkmin=Nkmin)
+        
     return rf_ser

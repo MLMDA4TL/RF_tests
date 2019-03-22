@@ -27,6 +27,9 @@ import sklearn.ensemble as skl_ens
 import pickle
 
 
+
+import classes_for_exps as transf
+
 # =============================================================================
 # 
 # =============================================================================
@@ -34,13 +37,13 @@ import pickle
 
 from collections import namedtuple
 
-score = namedtuple("Score", "algo max_depth nb_tree data auc score_rate tpr fpr f1 n_iter params comments")
+score = namedtuple("Score", "algo max_depth nb_tree data auc var_auc score_rate var_score_rate tpr var_tpr fpr var_fpr f1 var_f1 n_iter params comments")
 
 def write_score(scores_file, score):
 # scores_df = pd.read_csv(scores_file, sep=',', header=0)
     new_score_df = pd.DataFrame([[score.algo, score.max_depth, score.nb_tree,
-    score.data, score.auc, score.score_rate, score.tpr,
-    score.fpr, score.f1, score.n_iter, score.params, score.comments]])
+    score.data, score.auc, score.var_auc, score.score_rate, score.var_score_rate, score.tpr,
+    score.var_tpr, score.fpr, score.var_fpr, score.f1, score.var_f1, score.n_iter, score.params, score.comments]])
     with open(scores_file, 'a') as f:
         new_score_df.to_csv(f, header=False, index=False)
         f.close()
@@ -67,7 +70,7 @@ def del_cl_prop(sg,N,cl,p0):
             clust.weight = (1-p0)/N1
             sg.weights[i] = (1-p0)/N1
       
-def change_prop(sg,weights):
+def change_prop(sg,weights,hetero=False,sigma=1):
     labels = list(set(sg.class_labels))
     N = len(labels)
     
@@ -75,12 +78,29 @@ def change_prop(sg,weights):
     
     for i in range(N):
         nb_cl[i] = sg.class_labels.count(labels[i])
-        sg.weights[sg.class_labels == labels[i]] = weights[i]/nb_cl[i]
+        sg.weights[np.array(sg.class_labels) == labels[i]] = weights[i]/nb_cl[i]
 
         clusts = list(np.array(sg.clusters)[sg.class_labels == labels[i]])
         for c in clusts:
             c.weight = weights[i]/nb_cl[i]
+
+    randi = np.random.randn(len(sg.weights))
+
+    if hetero :
+        for k in range(len(sg.weights)):    
+            
+            
+            sig = sigma*sg.weights[k]/2
+            
+            sg.weights[k] = max(0,sig*randi[k] + sg.weights[k])
+            sg.clusters[k].weight = max(0,sig*randi[k] + sg.weights[k])
         
+        for i in range(N):
+            coeff = weights[i]/np.sum(sg.weights[np.array(sg.class_labels) == labels[i]])
+            sg.weights[np.array(sg.class_labels) == labels[i]] = coeff*sg.weights[np.array(sg.class_labels) == labels[i]]
+            clusts = list(np.array(sg.clusters)[sg.class_labels == labels[i]])
+            for c in clusts:
+                c.weight = coeff*c.weight                    
     #sg.compute_probabilities_draw_cluster()
 
 def new_cl_prop(sg,N,cl,p0):
@@ -127,16 +147,18 @@ def random_var_cl(sg,factor_min,factor_max,nb,clust = None):
     cluster_feature_std = {i: {cfs_phi[i]: cfs[i]} for i in range(nb)}
     
     apply_density_change(sg.clusters, cluster_feature_std)
-
-def change_cl_prop(sg,factor_min,factor_max,nb):
     
-    cfs = (factor_max - factor_min)*np.random.rand(len(sg.clusters)) + factor_min
-    cfs_phi = np.random.choice(np.linspace(0,sg.dimensionality-1,sg.dimensionality).astype(int),len(sg.clusters))
+#
+#def change_cl_prop(sg,factor_min,factor_max,nb):
+#    
+#    cfs = (factor_max - factor_min)*np.random.rand(len(sg.clusters)) + factor_min
+#    cfs_phi = np.random.choice(np.linspace(0,sg.dimensionality-1,sg.dimensionality).astype(int),len(sg.clusters))
+#    
+#    
+#    cluster_feature_std = {i: {cfs_phi[i]: cfs[i]} for i in range(nb)}
+#    
+#    apply_density_change(sg.clusters, cluster_feature_std)    
     
-    
-    cluster_feature_std = {i: {cfs_phi[i]: cfs[i]} for i in range(nb)}
-    
-    apply_density_change(sg.clusters, cluster_feature_std)    
 # =============================================================================
 #             
 # =============================================================================
@@ -144,14 +166,14 @@ unit_test = 1
 plots = 0
 WRITE_SCORE = 0
 
-N_EXP = 11
-N_REP = 10
+#N_EXP = 11
+N_REP = 3
 
 #if unit_test:
 #    print('Test unique')
 #    N_REP = 1
 
-path_out = './outputs/final/'
+path_out = './outputs/'
 
 score_rf = np.zeros(N_REP)
 score_rf_target = np.zeros(N_REP)
@@ -235,6 +257,21 @@ f1_rf_ser_no_red_no_ext = np.zeros(N_REP)
 f1_rf_ser_no_red_no_ext_cond = np.zeros(N_REP)
 ###
 
+# =============================================================================
+# 
+# =============================================================================
+my_exp = transf.experiment(N_REP)
+
+#scores functions :
+my_exp.add_score_function(transf.sc)
+my_exp.add_score_function(transf.f1)
+my_exp.add_score_function(transf.auc)
+my_exp.add_score_function(transf.tpr)
+my_exp.add_score_function(transf.fpr)
+
+# =============================================================================
+# 
+# =============================================================================
 
 for i in range(N_REP):
     N1 = 15
@@ -248,6 +285,8 @@ for i in range(N_REP):
     space_bound = 40
     
     n_source = 200
+    n_target_train = 200
+    
     minV = 5
     maxV = 15
     var = 3
@@ -275,17 +314,22 @@ for i in range(N_REP):
     params_init = 'D'+str(dim)+'space_size'+str(space_bound)+'nclustinit' +str(len(sg.clusters))+'prop_init'+ \
        str(prop0_init*N0)+'var'+str(minV)+'-'+str(maxV)+'n_source'+str(n_source)
        
-    if not unit_test:
-        pickle.dump(sg,open(path_out+"source_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".pkl","wb"))
-    
+#       
+#    if not unit_test:
+#        pickle.dump(sg,open(path_out+"source_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".pkl","wb"))
+#    
+       
+       
     #Mise en forme du source
     
     a = sg.get_full_dataset(n_source)
     X_source = a[1].values[:,:-1]
     Y_source = a[1].values[:,-1]
     
-    if not unit_test:
-        a[1].to_csv(path_out+"DataTrain_source_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
+#    
+#    if not unit_test:
+#        a[1].to_csv(path_out+"DataTrain_source_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
+
 
     if plots:
         sns.pairplot(a[1],hue="cluster")
@@ -299,21 +343,28 @@ for i in range(N_REP):
     #     Mise en forme du target :
     # =============================================================================
     var_change = False
-    ampl_var_change_m = 0.5 
-    ampl_var_change_M = 2 
+    ampl_var_change_m = 0.5
+    ampl_var_change_M = 2
     drift = True
-    v_drift = minV
+    v_drift = maxV
     n_clust_change = False
-    
-    #Only prop changes:
-    
-    prop1 = 0.05
-    prop0 = 0.95
-    transform = "prop_only"+str(prop0)
-    
-    
-    change_prop(sg,[prop0,prop1])
 
+    prop1 = 0.1
+    prop0 = 1 - prop1
+    
+    if n_clust_change or drift or var_change:
+        transform = ''
+    else:
+        transform = 'prop_only'+str(prop0)
+        
+    #Prop changes:
+    #change_prop(sg,[prop0,prop1])
+    
+    
+    #Heterogeneous prop change:
+    change_prop(sg,[prop0,prop1],hetero =True, sigma = 1)
+    
+    
     # Source Clusters Changes
     N0_T = 5
     N1_T = 5
@@ -321,7 +372,7 @@ for i in range(N_REP):
     N1_S = 0
     
     if n_clust_change :
-        transform = 'n_clust('+str(N0)+','+str(N1)+')->('+str(N0+N0_T-N0_S)+','+str(N1+N1_T-N1_S)+')'
+        transform += 'n_clust('+str(N0)+','+str(N1)+')->('+str(N0+N0_T-N0_S)+','+str(N1+N1_T-N1_S)+')'
         if ( N0_S > 0 or N1_S > 0 ) :
             del_cl_prop(sg,N0_S,0,prop0)
             del_cl_prop(sg,N1_S,1,prop0)
@@ -338,10 +389,10 @@ for i in range(N_REP):
 
     # Drift and Stretching : 
     if drift:
-        transform = "drift"+str(v_drift)
+        transform += "drift"+str(v_drift)
         random_drift_cl(sg,v_drift,len(sg.class_labels))
     if var_change :
-        transform = "var_change"+str(ampl_var_change_m)+'-'+str(ampl_var_change_M)
+        transform += "var_change"+str(ampl_var_change_m)+'-'+str(ampl_var_change_M)
         random_var_cl(sg,ampl_var_change_m,ampl_var_change_M,len(sg.class_labels))
 
     
@@ -350,20 +401,20 @@ for i in range(N_REP):
     # 
     #==============================================================================
     params_fin = 'nclust' +str(len(sg.clusters))+'prop'+ \
-       str(prop0)+'var'+str(minV)+'-'+str(maxV)+'n_source'+str(n_source)+'TRANSFORM--'+transform
+       str(prop0)+'var'+str(minV)+'-'+str(maxV)+'n_source'+str(n_source)+'n_target'+str(n_target_train)+'TRANSFORM--'+transform
        
     print('N clust target:',len(sg.clusters))
     
-    if not unit_test:
-        pickle.dump(sg,open(path_out+"target_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".pkl","wb"))
+#    if not unit_test:
+#        pickle.dump(sg,open(path_out+"target_generator_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".pkl","wb"))
     
     
     c = sg.get_full_dataset(10000)
     X_target_test = c[1].values[:,:-1]
     Y_target_test = c[1].values[:,-1]
 
-    if not unit_test:
-        c[1].to_csv(path_out+"DataTest_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
+#    if not unit_test:
+#        c[1].to_csv(path_out+"DataTest_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
 
     
     if plots:
@@ -371,10 +422,10 @@ for i in range(N_REP):
         plt.savefig(path_out+'test.pdf')
         plt.show()  
      
-    b = sg.get_full_dataset(n_source)
+    b = sg.get_full_dataset(n_target_train)
     
-    if not unit_test:
-        b[1].to_csv(path_out+"DataTrain_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
+#    if not unit_test:
+#        b[1].to_csv(path_out+"DataTrain_target_"+sg.get_file_name()+"Exp"+str(N_EXP)+name_param+str(var)+"_Rep"+str(i)+".csv")
 
     X_target_train = b[1].values[:,:-1]
     Y_target_train = b[1].values[:,-1]
@@ -429,9 +480,24 @@ for i in range(N_REP):
         #rf_strut = STRUT.STRUT_RF(rf,X_target_train,Y_target_train, pruning_updated_node=True, no_prune_on_cl=False, cl_no_prune=None, prune_lone_instance=True)
 
         # =============================================================================
-        #         
+        #         CLASSES
         # =============================================================================
- 
+        name_list = ['source','target','ser','ser no red','ser no ext','ser no ext cond','ser no red no ext', 'ser no red no ext cond', 'strut', 'strut adapt']
+        clf_list = [rf,rf_target,rf_ser,rf_ser_no_red,rf_ser_no_ext,rf_ser_ext_cond,rf_ser_no_red_no_ext,rf_ser_no_red_no_ext_cond,rf_strut, rf_strut_adapt]
+         
+        my_exp.routine_algos(clf_list, name_list, X_target_test, Y_target_test)
+#        
+#        rf_ = transfer_algo('source',rf,X_target_test,Y_target_test,N_REP)
+#        rf_target_ = transfer_algo('target',rf_target,X_target_test,Y_target_test,N_REP)
+#        rf_ser_ = transfer_algo('ser',rf_ser,X_target_test,Y_target_test,n_iter)
+#        rf_ser_no_red_ = transfer_algo('ser no red',rf_ser_no_red,X_target_test,Y_target_test,n_iter)
+#        rf_ser_no_ext_ = transfer_algo('ser no ext',rf_ser_no_ext,X_target_test,Y_target_test,n_iter)
+#        rf_ser_no_ext_cond_ = transfer_algo('ser no ext cond',rf_ser_ext_cond,X_target_test,Y_target_test,n_iter)
+#        rf_ser_no_red_no_ext_ = transfer_algo('ser no red no ext',rf_ser_no_red_no_ext,X_target_test,Y_target_test,n_iter)
+#        rf_ser_no_red_no_ext_cond_ = transfer_algo('ser no red no ext cond',rf_ser_no_red_no_ext_cond,X_target_test,Y_target_test,n_iter)
+#        rf_strut_ = transfer_algo('strut',rf_strut,X_target_test,Y_target_test,n_iter)
+#        rf_strut_adapt_ = transfer_algo('strut adapt',rf_strut_adapt,X_target_test,Y_target_test,n_iter)
+        
 # =============================================================================
 # 
 # =============================================================================        
@@ -570,7 +636,7 @@ for i in range(N_REP):
         ###
         
 
-scores_file = './scores_file.csv'
+scores_file = './scores/scores_file.csv'
 if MAX_DEPTH == None : 
     score.max_depth = "None" 
 else:
@@ -583,6 +649,14 @@ score.comments = ""
 
 score.params = params_init+'_INTO_'+params_fin
 
+# =============================================================================
+# 
+# =============================================================================
+my_exp.compute_means_var()
+# =============================================================================
+# 
+# =============================================================================
+
 if WRITE_SCORE:
     # =============================================================================
     #  
@@ -590,18 +664,28 @@ if WRITE_SCORE:
         
     score.algo = "source"
     score.score_rate = np.mean(score_rf)
+    score.var_score_rate = np.std(score_rf)
     score.tpr = np.mean(tpr_rf)
+    score.var_tpr = np.std(tpr_rf)
     score.fpr = np.mean(fpr_rf)
+    score.var_fpr = np.std(fpr_rf)
     score.f1 = np.mean(f1_rf)
+    score.var_f1 = np.std(f1_rf)
     score.auc = np.mean(auc_rf)
+    score.var_auc = np.std(auc_rf)
     write_score(scores_file, score)
     
     score.algo = "target"
     score.score_rate = np.mean(score_rf_target)
+    score.var_score_rate = np.std(score_rf_target)
     score.tpr = np.mean(tpr_rf_target)
+    score.var_tpr = np.std(tpr_rf_target)
     score.fpr = np.mean(fpr_rf_target)
+    score.var_fpr = np.std(fpr_rf_target)
     score.f1 = np.mean(f1_rf_target)
+    score.var_f1 = np.std(f1_rf_target)
     score.auc = np.mean(auc_rf_target)
+    score.var_auc = np.std(auc_rf_target)
     write_score(scores_file, score)
     
     # =============================================================================
@@ -610,50 +694,80 @@ if WRITE_SCORE:
     
     score.algo = "ser"
     score.score_rate = np.mean(score_rf_ser)
+    score.var_score_rate = np.std(score_rf_ser)
     score.tpr = np.mean(tpr_rf_ser)
+    score.var_tpr = np.std(tpr_rf_ser)
     score.fpr = np.mean(fpr_rf_ser)
+    score.var_fpr = np.std(fpr_rf_ser)
     score.f1 = np.mean(f1_rf_ser)
+    score.var_f1 = np.std(f1_rf_ser)
     score.auc = np.mean(auc_rf_ser)
+    score.var_auc = np.std(auc_rf_ser)
     write_score(scores_file, score)
     
     score.algo = "ser no red"
     score.score_rate = np.mean(score_rf_ser_no_red)
+    score.var_score_rate = np.std(score_rf_ser_no_red)
     score.tpr = np.mean(tpr_rf_ser_no_red)
+    score.var_tpr = np.std(tpr_rf_ser_no_red)
     score.fpr = np.mean(fpr_rf_ser_no_red)
+    score.var_fpr = np.std(fpr_rf_ser_no_red)
     score.f1 = np.mean(f1_rf_ser_no_red)
+    score.var_f1 = np.std(f1_rf_ser_no_red)
     score.auc = np.mean(auc_rf_ser_no_red)
+    score.var_auc = np.std(auc_rf_ser_no_red)
     write_score(scores_file, score)
     
     score.algo = "ser no ext"
     score.score_rate = np.mean(score_rf_ser_no_ext)
+    score.var_score_rate = np.std(score_rf_ser_no_ext)
     score.tpr = np.mean(tpr_rf_ser_no_ext)
+    score.var_tpr = np.std(tpr_rf_ser_no_ext)
     score.fpr = np.mean(fpr_rf_ser_no_ext)
+    score.var_fpr = np.std(fpr_rf_ser_no_ext)
     score.f1 = np.mean(f1_rf_ser_no_ext)
+    score.var_f1 = np.std(f1_rf_ser_no_ext)
     score.auc = np.mean(auc_rf_ser_no_ext)
+    score.var_auc = np.std(auc_rf_ser_no_ext)
     write_score(scores_file, score)
     
     score.algo = "ser no ext cond"
     score.score_rate = np.mean(score_rf_ser_ext_cond)
+    score.var_score_rate = np.std(score_rf_ser_ext_cond)
     score.tpr = np.mean(tpr_rf_ser_ext_cond)
+    score.var_tpr = np.std(tpr_rf_ser_ext_cond)
     score.fpr = np.mean(fpr_rf_ser_ext_cond)
+    score.var_fpr = np.std(fpr_rf_ser_ext_cond)
     score.f1 = np.mean(f1_rf_ser_ext_cond)
+    score.var_f1 = np.std(f1_rf_ser_ext_cond)
     score.auc = np.mean(auc_rf_ser_ext_cond)
+    score.var_auc = np.std(auc_rf_ser_ext_cond)
     write_score(scores_file, score)
     
     score.algo = "ser no red no ext"
     score.score_rate = np.mean(score_rf_ser_no_red_no_ext)
+    score.var_score_rate = np.std(score_rf_ser_no_red_no_ext)
     score.tpr = np.mean(tpr_rf_ser_no_red_no_ext)
+    score.var_tpr = np.std(tpr_rf_ser_no_red_no_ext)
     score.fpr = np.mean(fpr_rf_ser_no_red_no_ext)
+    score.var_fpr = np.std(fpr_rf_ser_no_red_no_ext)
     score.f1 = np.mean(f1_rf_ser_no_red_no_ext)
+    score.var_f1 = np.std(f1_rf_ser_no_red_no_ext)
     score.auc = np.mean(auc_rf_ser_no_red_no_ext)
+    score.var_auc = np.std(auc_rf_ser_no_red_no_ext)
     write_score(scores_file, score)
     
     score.algo = "ser no red no ext cond"
     score.score_rate = np.mean(score_rf_ser_no_red_no_ext_cond)
+    score.var_score_rate = np.std(score_rf_ser_no_red_no_ext_cond)
     score.tpr = np.mean(tpr_rf_ser_no_red_no_ext_cond)
+    score.var_tpr = np.std(tpr_rf_ser_no_red_no_ext_cond)
     score.fpr = np.mean(fpr_rf_ser_no_red_no_ext_cond)
+    score.var_fpr = np.std(fpr_rf_ser_no_red_no_ext_cond)
     score.f1 = np.mean(f1_rf_ser_no_red_no_ext_cond)
+    score.var_f1 = np.std(f1_rf_ser_no_red_no_ext_cond)
     score.auc = np.mean(auc_rf_ser_no_red_no_ext_cond)
+    score.var_auc = np.std(auc_rf_ser_no_red_no_ext_cond)
     write_score(scores_file, score)
     
     # =============================================================================
@@ -663,10 +777,15 @@ if WRITE_SCORE:
     
     score.algo = "strut"
     score.score_rate = np.mean(score_rf_strut)
+    score.var_score_rate = np.std(score_rf_strut)
     score.tpr = np.mean(tpr_rf_strut)
+    score.var_tpr = np.std(tpr_rf_strut)
     score.fpr = np.mean(fpr_rf_strut)
+    score.var_fpr = np.std(fpr_rf_strut)
     score.f1 = np.mean(f1_rf_strut)
+    score.var_f1 = np.std(f1_rf_strut)
     score.auc = np.mean(auc_rf_strut)
+    score.var_auc = np.std(auc_rf_strut)
     write_score(scores_file, score)
     
     #score.algo = "strut noprune update"
@@ -690,7 +809,8 @@ if WRITE_SCORE:
     # =============================================================================
 
 print('Scores :')
-print('    Source : ', np.mean(score_rf))
+#print('    Source : ', np.mean(score_rf))
+print('    Source : ', my_exp.algo_list[name_list.index('source')].scores_to_save.means[0])
 
 print('    Target : ',np.mean(score_rf_target))
 print('    Ser : ',np.mean(score_rf_ser))
