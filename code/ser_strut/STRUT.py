@@ -127,12 +127,19 @@ def threshold_selection(Q_source_parent,
                         Y_target_node,
                         phi,
                         classes,
-                        use_divergence=True):
+                        use_divergence=True,
+                        measure_default_IG=True):
     # print("Q_source_parent : ", Q_source_parent)
     # sort the corrdinates of X along phi
-    X_phi_sorted = np.sort(X_target_node[:, phi])
+    X_phi_sorted = np.array(list(set(X_target_node[:, phi])))
+    X_phi_sorted = np.sort(X_phi_sorted)
     # print(X_phi_sorted)
-    nb_tested_thresholds = X_target_node.shape[0] - 1
+    nb_tested_thresholds = X_phi_sorted.shape[0] - 1
+    # if no different values of phi, return the value
+    if nb_tested_thresholds == 0:
+        print("SAME VALUES OF PHI IN NODE")
+        return X_phi_sorted[0]
+    # print("nb_tested_thresholds ", nb_tested_thresholds)
     measures_IG = np.zeros(nb_tested_thresholds)
     measures_DG = np.zeros(nb_tested_thresholds)
     for i in range(nb_tested_thresholds):
@@ -150,12 +157,24 @@ def threshold_selection(Q_source_parent,
                             Q_target_l,
                             Q_target_r)
     index = 0
+    # index_nodiv = 0
+    found_max = 0
     if use_divergence:
         for i in range(1, nb_tested_thresholds - 1):
+            found_max = 1
             if measures_IG[i] >= measures_IG[i - 1] and measures_IG[i] >= measures_IG[i + 1] and measures_DG[i] > measures_DG[index]:
                 index = i
+        if not found_max:
+            # print("MAX NOT FOUND")
+            if measure_default_IG:
+                index = np.argmax(measures_IG)
+            else:
+                index = np.argmax(measures_DG)
     else:
         index = np.argmax(measures_IG)
+    # print("index : ", index)
+    # print("index nodiv: ", index_nodiv)
+    # print("INDEX DIFFERENTS ? ", index - index_nodiv)
 
     threshold = (X_phi_sorted[index] + X_phi_sorted[index + 1]) * 1. / 2
     return threshold
@@ -207,7 +226,8 @@ def STRUT(decisiontree,
           prune_lone_instance=True,
           adapt_prop=False,
           coeffs=[1, 1],
-          use_divergence=True):
+          use_divergence=True,
+          measure_default_IG=True):
     tree = decisiontree.tree_
     phi = tree.feature[node_index]
     classes = decisiontree.classes_
@@ -356,7 +376,8 @@ def STRUT(decisiontree,
                                  Y_target_node,
                                  phi,
                                  classes,
-                                 use_divergence=use_divergence)
+                                 use_divergence=use_divergence,
+                                 measure_default_IG=measure_default_IG)
         Q_target_l, Q_target_r = compute_Q_children_target(X_target_node,
                                                            Y_target_node,
                                                            phi,
@@ -373,7 +394,10 @@ def STRUT(decisiontree,
                                  Y_target_node,
                                  phi,
                                  classes,
-                                 use_divergence=use_divergence)
+                                 use_divergence=use_divergence,
+                                 measure_default_IG=measure_default_IG)
+        # print("t1-t2 = ", t1 - t2)
+        # print("use_divergence ", use_divergence)
         Q_target_l, Q_target_r = compute_Q_children_target(X_target_node,
                                                            Y_target_node,
                                                            phi,
@@ -412,8 +436,10 @@ def STRUT(decisiontree,
               pruning_updated_node=pruning_updated_node,
               no_prune_on_cl=no_prune_on_cl,
               cl_no_prune=cl_no_prune,
-              adapt_prop=False,
-              coeffs=[1, 1])
+              adapt_prop=adapt_prop,
+              coeffs=coeffs,
+              use_divergence=use_divergence,
+              measure_default_IG=measure_default_IG)
 
     if tree.children_right[node_index] != -1:
         # Computing target data passing through node NOT updated
@@ -435,8 +461,10 @@ def STRUT(decisiontree,
               pruning_updated_node=pruning_updated_node,
               no_prune_on_cl=no_prune_on_cl,
               cl_no_prune=cl_no_prune,
-              adapt_prop=False,
-              coeffs=[1, 1])
+              adapt_prop=adapt_prop,
+              coeffs=coeffs,
+              use_divergence=use_divergence,
+              measure_default_IG=measure_default_IG)
 
 
 def STRUT_RF(random_forest,
@@ -447,7 +475,8 @@ def STRUT_RF(random_forest,
              cl_no_prune=None,
              prune_lone_instance=True,
              adapt_prop=False,
-             use_divergence=True):
+             use_divergence=True,
+             measure_default_IG=True):
 
     rf_strut = copy.deepcopy(random_forest)
     for i, dtree in enumerate(rf_strut.estimators_):
@@ -471,8 +500,10 @@ def STRUT_RF(random_forest,
                   no_prune_on_cl=no_prune_on_cl,
                   cl_no_prune=cl_no_prune,
                   prune_lone_instance=prune_lone_instance,
-                  adapt_prop=True,
-                  coeffs=coeffs)
+                  adapt_prop=adapt_prop,
+                  coeffs=coeffs,
+                  use_divergence=use_divergence,
+                  measure_default_IG=measure_default_IG)
         else:
             STRUT(rf_strut.estimators_[i],
                   0,
@@ -483,7 +514,9 @@ def STRUT_RF(random_forest,
                   pruning_updated_node=pruning_updated_node,
                   no_prune_on_cl=no_prune_on_cl,
                   cl_no_prune=cl_no_prune,
-                  prune_lone_instance=prune_lone_instance)
+                  prune_lone_instance=prune_lone_instance,
+                  use_divergence=use_divergence,
+                  measure_default_IG=measure_default_IG)
 
     return rf_strut
 
